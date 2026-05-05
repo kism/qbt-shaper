@@ -2,11 +2,11 @@
 
 import argparse
 import asyncio
+from pathlib import Path
 
-from dotenv import load_dotenv
 from rich import traceback
 
-from .config import load_config
+from .config import DEFAULT_CONFIG_PATH, load_config
 from .constants import PROGRAM_NAME, PROGRAM_NAME_WITH_VERSION
 from .loop import run_loop
 from .utils.logger import get_logger, setup_logger_cli
@@ -23,6 +23,13 @@ def _get_args() -> argparse.Namespace:
         default=0,
         help="Increase verbosity (can be used multiple times).",
     )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=DEFAULT_CONFIG_PATH,
+        metavar="PATH",
+        help=f"Path to JSON config file (default: {DEFAULT_CONFIG_PATH}).",
+    )
     return parser.parse_args()
 
 
@@ -31,8 +38,9 @@ def main() -> None:
     args = _get_args()
     setup_logger_cli(args.v)
     logger.info("%s", PROGRAM_NAME_WITH_VERSION)
-    load_dotenv()
-    config = load_config()
+    config = load_config(args.config)
+    print("CONFIG")
+    print(config.model_dump_json(indent=2))
     asyncio.run(run_loop(config))
 
 
