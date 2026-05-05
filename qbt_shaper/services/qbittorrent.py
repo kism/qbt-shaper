@@ -8,9 +8,10 @@ import qbittorrentapi
 from qbt_shaper.utils.logger import get_logger
 
 if TYPE_CHECKING:
-    from qbt_shaper.config import QbittorrentConfig
+    from qbt_shaper.config import QbittorrentConfig, SpeedLimits
 else:
     QbittorrentConfig = object
+    SpeedLimits = object
 
 logger = get_logger(__name__)
 
@@ -67,33 +68,26 @@ class QbittorrentClient:
         limits = self._config.speed_limits.streaming
         await self.set_alt_speed_limits(dl_kib=limits.dl, ul_kib=limits.ul)
 
-    async def apply_present_limits(self) -> None:
-        """Apply the configured present (someone home) speed limits."""
-        limits = self._config.speed_limits.present
+    async def _apply_global_limits(self, description: str, limits: "SpeedLimits") -> None:
         await asyncio.to_thread(
             self._client.app_set_preferences,
             {"dl_limit": limits.dl * 1024, "up_limit": limits.ul * 1024},
         )
         logger.info(
-            "Set present speed limits on qBittorrent at %s: dl=%d KiB/s ul=%d KiB/s",
+            "Set %s speed limits on qBittorrent at %s: dl=%d KiB/s ul=%d KiB/s",
+            description,
             self._client.host,
             limits.dl,
             limits.ul,
         )
 
+    async def apply_present_limits(self) -> None:
+        """Apply the configured present (someone home) speed limits."""
+        await self._apply_global_limits("present", self._config.speed_limits.present)
+
     async def apply_vacant_limits(self) -> None:
         """Apply the configured vacant (nobody home) speed limits."""
-        limits = self._config.speed_limits.vacant
-        await asyncio.to_thread(
-            self._client.app_set_preferences,
-            {"dl_limit": limits.dl * 1024, "up_limit": limits.ul * 1024},
-        )
-        logger.info(
-            "Set vacant speed limits on qBittorrent at %s: dl=%d KiB/s ul=%d KiB/s",
-            self._client.host,
-            limits.dl,
-            limits.ul,
-        )
+        await self._apply_global_limits("vacant", self._config.speed_limits.vacant)
 
     async def set_speed_limit_enabled(self, *, enabled: bool) -> None:
         """Enable or disable the global alternative speed limit mode.
