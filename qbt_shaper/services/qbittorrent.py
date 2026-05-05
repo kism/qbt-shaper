@@ -40,27 +40,20 @@ class QbittorrentClient:
         """Set the alternative (throttled) speed limits in KiB/s. 0 means unlimited."""
         dl_field = "alt_dl_limit"
         ul_field = "alt_up_limit"
+        multiplier = 1024  # qBittorrent API expects speeds in bytes/s
         # Convert dl_ for god knows why
-        dl_kib = dl_kib * 1024
-        ul_kib = ul_kib * 1024
+        dl_kib = dl_kib * multiplier
+        ul_kib = ul_kib * multiplier
 
         await asyncio.to_thread(
             self._client.app_set_preferences,
             {dl_field: dl_kib, ul_field: ul_kib},
         )
         logger.info(
-            "Set alt speed limits on qBittorrent at %s: dl=%d KiB/s ul=%d KiB/s",
+            "Set alt speed limits (streaming mode) on qBittorrent at %s: dl=%d KiB/s ul=%d KiB/s",
             self._client.host,
-            dl_kib,
-            ul_kib,
-        )
-        current_settings = self._client.app_preferences()
-
-        logger.warning(
-            "Current alt speed limits on qBittorrent at %s: dl=%d KiB/s ul=%d KiB/s",
-            self._client.host,
-            current_settings[dl_field],
-            current_settings[ul_field],
+            dl_kib // multiplier,
+            ul_kib // multiplier,
         )
 
     async def apply_streaming_limits(self) -> None:
