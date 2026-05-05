@@ -6,7 +6,7 @@ from pathlib import Path
 
 from rich import traceback
 
-from .config import DEFAULT_CONFIG_PATH, load_config
+from .config import DEFAULT_CONFIG_PATH, load_config, write_config
 from .constants import PROGRAM_NAME, PROGRAM_NAME_WITH_VERSION
 from .loop import run_loop
 from .utils.logger import get_logger, setup_logger_cli
@@ -39,8 +39,7 @@ def main() -> None:
     setup_logger_cli(args.v)
     logger.info("%s", PROGRAM_NAME_WITH_VERSION)
     config = load_config(args.config)
-    print("CONFIG")
-    print(config.model_dump_json(indent=2))
+    write_config(config, args.config)
     asyncio.run(run_loop(config))
 
 

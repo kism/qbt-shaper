@@ -1,8 +1,7 @@
 """Main application loop."""
 
-from __future__ import annotations
-
 import asyncio
+import time
 from typing import TYPE_CHECKING
 
 import aiohttp
@@ -16,6 +15,7 @@ if TYPE_CHECKING:
     from .config import AppConfig
 
 LOOP_INTERVAL_SECONDS = 15
+PRESENCE_CHECK_INTERVAL_SECONDS = 60
 
 logger = get_logger(__name__)
 
@@ -51,6 +51,19 @@ async def _apply_speed_limit(
             logger.warning("Failed to set speed limit on qBittorrent instance", exc_info=True)
 
 
+async def _apply_presence_limits(
+    qbt_clients: list[QbittorrentClient],
+) -> None:
+    """Apply speed limits based on home presence. Requires Home Assistant configuration."""
+    # TODO: implement Home Assistant presence detection and apply vacant/present limits
+    # For now, always apply the present limits as the default.
+    for client in qbt_clients:
+        try:
+            await client.apply_present_limits()
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to apply presence limits on qBittorrent instance", exc_info=True)
+
+
 async def run_loop(config: AppConfig) -> None:
     """Run the main monitoring and control loop."""
     async with aiohttp.ClientSession() as session:
@@ -65,7 +78,21 @@ async def run_loop(config: AppConfig) -> None:
             len(qbt_clients),
         )
 
+        for client in qbt_clients:
+            await client.login()
+            await client.apply_streaming_limits()
+            await client.apply_present_limits()
+
+        last_presence_check = time.monotonic() - PRESENCE_CHECK_INTERVAL_SECONDS
+
         while True:
+            now = time.monotonic()
+
             active = await _check_active_streams(jellyfin_clients, dispatcharr_clients)
             await _apply_speed_limit(qbt_clients, limit=active)
+
+            if now - last_presence_check >= PRESENCE_CHECK_INTERVAL_SECONDS:
+                await _apply_presence_limits(qbt_clients)
+                last_presence_check = now
+
             await asyncio.sleep(LOOP_INTERVAL_SECONDS)

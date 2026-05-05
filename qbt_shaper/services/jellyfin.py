@@ -1,7 +1,5 @@
 """Jellyfin API client."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any
 
 from qbt_shaper.constants import PROGRAM_NAME, PROGRAM_VERSION
@@ -44,7 +42,7 @@ class JellyfinClient:
         """Obtain an access token using the configured credentials."""
         payload = {
             "Username": self._config.username,
-            "Pw": self._config.password.get_secret_value(),
+            "Pw": self._config.password,
         }
         async with self._session.post(
             self._url(_AUTH_PATH),
