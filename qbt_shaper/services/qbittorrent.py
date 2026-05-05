@@ -30,11 +30,30 @@ class QbittorrentClient:
             username=config.username,
             password=config.password,
         )
+        self._applied_global: tuple[int, int] | None = None
+        self._applied_alt: tuple[int, int] | None = None
+        self._applied_limit_enabled: bool | None = None
 
     async def login(self) -> None:
         """Authenticate with the qBittorrent WebUI."""
         await asyncio.to_thread(self._client.auth_log_in)
         logger.info("Logged in to qBittorrent at %s", self._client.host)
+
+    async def get_upload_speed_bytes(self) -> int:
+        """Return the current upload speed in bytes/s."""
+        info = await asyncio.to_thread(self._client.transfer_info)
+        speed = info["up_info_speed"]
+        return speed if isinstance(speed, int) else 0
+
+    def base_limit_bytes(self, presence: str) -> tuple[int, int]:
+        """Return (dl_bytes, ul_bytes) for the given presence state ('present' or 'vacant')."""
+        if presence == "vacant":
+            dl = self._kbps_percent_to_bytes(self._speed.dl_max_kbps, self._speed.dl_vacant_percent)
+            ul = self._kbps_percent_to_bytes(self._speed.ul_max_kbps, self._speed.ul_vacant_percent)
+        else:
+            dl = self._kbps_percent_to_bytes(self._speed.dl_max_kbps, self._speed.dl_present_percent)
+            ul = self._kbps_percent_to_bytes(self._speed.ul_max_kbps, self._speed.ul_present_percent)
+        return dl, ul
 
     @staticmethod
     def _kbps_percent_to_bytes(max_kbps: int, percent: int) -> int:
@@ -43,22 +62,20 @@ class QbittorrentClient:
 
     async def set_alt_speed_limits(self, dl_kib: int, ul_kib: int) -> None:
         """Set the alternative (throttled) speed limits in KiB/s. 0 means unlimited."""
-        dl_field = "alt_dl_limit"
-        ul_field = "alt_up_limit"
-        multiplier = 1024  # qBittorrent API expects speeds in bytes/s
-        # Convert dl_ for god knows why
-        dl_kib = dl_kib * multiplier
-        ul_kib = ul_kib * multiplier
-
+        dl_bytes = dl_kib * 1024
+        ul_bytes = ul_kib * 1024
+        if self._applied_alt == (dl_bytes, ul_bytes):
+            return
         await asyncio.to_thread(
             self._client.app_set_preferences,
-            {dl_field: dl_kib, ul_field: ul_kib},
+            {"alt_dl_limit": dl_bytes, "alt_up_limit": ul_bytes},
         )
+        self._applied_alt = (dl_bytes, ul_bytes)
         logger.info(
             "Set alt speed limits (streaming mode) on qBittorrent at %s: dl=%d KiB/s ul=%d KiB/s",
             self._client.host,
-            dl_kib // multiplier,
-            ul_kib // multiplier,
+            dl_kib,
+            ul_kib,
         )
 
     async def apply_streaming_limits(self) -> None:
@@ -68,10 +85,13 @@ class QbittorrentClient:
         await self.set_alt_speed_limits(dl_kib=dl // 1024, ul_kib=ul // 1024)
 
     async def _apply_global_limits(self, description: str, dl_bytes: int, ul_bytes: int) -> None:
+        if self._applied_global == (dl_bytes, ul_bytes):
+            return
         await asyncio.to_thread(
             self._client.app_set_preferences,
             {"dl_limit": dl_bytes, "up_limit": ul_bytes},
         )
+        self._applied_global = (dl_bytes, ul_bytes)
         logger.info(
             "Set %s speed limits on qBittorrent at %s: dl=%d KiB/s ul=%d KiB/s",
             description,
@@ -101,6 +121,9 @@ class QbittorrentClient:
 
         :param enabled: True to enable speed limiting, False to disable.
         """
+        if self._applied_limit_enabled == enabled:
+            return
         await asyncio.to_thread(self._client.transfer_set_speed_limits_mode, enabled)
+        self._applied_limit_enabled = enabled
         state = "enabled" if enabled else "disabled"
         logger.info("Speed limit %s on qBittorrent at %s", state, self._client.host)
