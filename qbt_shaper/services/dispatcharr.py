@@ -14,14 +14,14 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 _TOKEN_PATH = "/api/accounts/token/"
-_M3U_ACCOUNTS_PATH = "/api/m3u/accounts/"
+_TS_STATUS_PATH = "/proxy/ts/status"
 
 
 class DispatcharrClient:
     """Async client for the Dispatcharr API.
 
     Authenticates via JWT (POST /api/accounts/token/) and checks active
-    viewer counts across all M3U account profiles.
+    stream counts via GET /proxy/ts/status.
     """
 
     def __init__(self, config: DispatcharrConfig, session: aiohttp.ClientSession) -> None:
@@ -51,20 +51,17 @@ class DispatcharrClient:
         logger.info("Logged in to Dispatcharr at %s", self._config.url)
 
     async def has_active_streams(self) -> bool:
-        """Return True if any M3U account profile currently has viewers.
+        """Return True if any channel is currently active.
 
-        Fetches GET /api/m3u/accounts/ and sums current_viewers across all
-        profiles in all accounts.
+        Fetches GET /proxy/ts/status and checks the top-level ``count`` field.
         """
-        async with self._session.get(self._url(_M3U_ACCOUNTS_PATH), headers=self._auth_headers()) as resp:
+        if self._token is None:
+            await self.login()
+
+        async with self._session.get(self._url(_TS_STATUS_PATH), headers=self._auth_headers()) as resp:
             resp.raise_for_status()
-            accounts: list[dict[str, Any]] = await resp.json()
+            data: dict[str, Any] = await resp.json()
 
-        total_viewers = sum(
-            profile.get("current_viewers", 0)
-            for account in accounts
-            for profile in account.get("profiles", [])
-        )
-
-        logger.debug("Dispatcharr %s: %d active viewer(s)", self._config.url, total_viewers)
-        return total_viewers > 0
+        count: int = data.get("count", 0)
+        logger.debug("Dispatcharr %s: %d active channel(s)", self._config.url, count)
+        return count > 0

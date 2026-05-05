@@ -25,7 +25,17 @@ async def _check_active_streams(
     dispatcharr_clients: list[DispatcharrClient],
 ) -> bool:
     """Return True if any Jellyfin or Dispatcharr instance reports active streams."""
-    raise NotImplementedError
+    checks = [
+        *[client.has_active_streams() for client in jellyfin_clients],
+        *[client.has_active_streams() for client in dispatcharr_clients],
+    ]
+    results = await asyncio.gather(*checks, return_exceptions=True)
+    for result in results:
+        if isinstance(result, Exception):
+            logger.warning("Stream check failed: %s", result)
+        elif result is True:
+            return True
+    return False
 
 
 async def _apply_speed_limit(
@@ -34,7 +44,11 @@ async def _apply_speed_limit(
     limit: bool,
 ) -> None:
     """Enable or disable speed limiting on all configured qBittorrent instances."""
-    raise NotImplementedError
+    for client in qbt_clients:
+        try:
+            await client.set_speed_limit_enabled(enabled=limit)
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to set speed limit on qBittorrent instance", exc_info=True)
 
 
 async def run_loop(config: AppConfig) -> None:
