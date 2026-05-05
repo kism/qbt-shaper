@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ..utils.logger import get_logger
+from qbt_shaper.utils.logger import get_logger
 
 if TYPE_CHECKING:
     import aiohttp
 
-    from ..config import JellyfinConfig
+    from qbt_shaper.config import JellyfinConfig
 
 logger = get_logger(__name__)
 

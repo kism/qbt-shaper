@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 
 import aiohttp
 
-from .config import AppConfig
 from .services.dispatcharr import DispatcharrClient
 from .services.jellyfin import JellyfinClient
 from .services.qbittorrent import QbittorrentClient
 from .utils.logger import get_logger
+
+if TYPE_CHECKING:
+    from .config import AppConfig
 
 LOOP_INTERVAL_SECONDS = 15
 
@@ -39,7 +42,7 @@ async def run_loop(config: AppConfig) -> None:
     async with aiohttp.ClientSession() as session:
         jellyfin_clients = [JellyfinClient(cfg, session) for cfg in config.jellyfin_instances]
         dispatcharr_clients = [DispatcharrClient(cfg, session) for cfg in config.dispatcharr_instances]
-        qbt_clients = [QbittorrentClient(cfg, session) for cfg in config.qbittorrent_instances]
+        qbt_clients = [QbittorrentClient(cfg) for cfg in config.qbittorrent_instances]
 
         logger.info(
             "Monitoring %d Jellyfin, %d Dispatcharr, %d qBittorrent instance(s)",
