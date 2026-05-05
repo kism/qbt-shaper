@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 
+from dotenv import load_dotenv
 from rich import traceback
 
 from .config import load_config
@@ -30,6 +31,7 @@ def main() -> None:
     args = _get_args()
     setup_logger_cli(args.v)
     logger.info("%s", PROGRAM_NAME_WITH_VERSION)
+    load_dotenv()
     config = load_config()
     asyncio.run(run_loop(config))
 
