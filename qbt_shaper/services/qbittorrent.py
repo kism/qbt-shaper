@@ -37,12 +37,15 @@ class QbittorrentClient:
 
     async def set_alt_speed_limits(self, dl_kib: int, ul_kib: int) -> None:
         """Set the alternative (throttled) speed limits in KiB/s. 0 means unlimited."""
+        dl_field = "alt_dl_limit"
+        ul_field = "alt_up_limit"
         # Convert dl_ for god knows why
         dl_kib = dl_kib * 1024
+        ul_kib = ul_kib * 1024
 
         await asyncio.to_thread(
             self._client.app_set_preferences,
-            {"alt_dl_limit": dl_kib, "alt_ul_limit": ul_kib},
+            {dl_field: dl_kib, ul_field: ul_kib},
         )
         logger.info(
             "Set alt speed limits on qBittorrent at %s: dl=%d KiB/s ul=%d KiB/s",
@@ -50,11 +53,19 @@ class QbittorrentClient:
             dl_kib,
             ul_kib,
         )
+        current_settings = self._client.app_preferences()
+
+        logger.warning(
+            "Current alt speed limits on qBittorrent at %s: dl=%d KiB/s ul=%d KiB/s",
+            self._client.host,
+            current_settings[dl_field],
+            current_settings[ul_field],
+        )
 
     async def apply_streaming_limits(self) -> None:
         """Apply the configured streaming speed limits as the alternative speed limits."""
         limits = self._config.speed_limits.streaming
-        await self.set_alt_speed_limits(limits.dl, limits.ul)
+        await self.set_alt_speed_limits(dl_kib=limits.dl, ul_kib=limits.ul)
 
     async def apply_present_limits(self) -> None:
         """Apply the configured present (someone home) speed limits."""
