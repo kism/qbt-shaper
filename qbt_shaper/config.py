@@ -50,12 +50,21 @@ class QbittorrentConfig(ServiceConfig):
     speed_limits: SpeedLimitPresets = SpeedLimitPresets()
 
 
+class HomeAssistantConfig(BaseModel):
+    """Configuration for Home Assistant presence detection."""
+
+    url: str = ""
+    token: str = ""
+    presence_entities: list[str] = []
+
+
 class AppConfig(BaseModel):
     """Full application configuration, loaded from a JSON file."""
 
     jellyfin_instances: list[JellyfinConfig] = []
     dispatcharr_instances: list[DispatcharrConfig] = []
     qbittorrent_instances: list[QbittorrentConfig] = []
+    home_assistant: HomeAssistantConfig = HomeAssistantConfig()
 
 
 def load_config(config_path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import aiohttp
 
 from .services.dispatcharr import DispatcharrClient
+from .services.homeassistant import HomeAssistantClient
 from .services.jellyfin import JellyfinClient
 from .services.qbittorrent import QbittorrentClient
 from .utils.logger import get_logger
@@ -53,13 +54,21 @@ async def _apply_speed_limit(
 
 async def _apply_presence_limits(
     qbt_clients: list[QbittorrentClient],
+    ha_client: HomeAssistantClient,
 ) -> None:
-    """Apply speed limits based on home presence. Requires Home Assistant configuration."""
-    # TODO: implement Home Assistant presence detection and apply vacant/present limits
-    # For now, always apply the present limits as the default.
+    """Apply vacant or present speed limits based on Home Assistant presence."""
+    if ha_client.is_configured():
+        anyone_home = await ha_client.any_entity_home()
+        apply = QbittorrentClient.apply_present_limits if anyone_home else QbittorrentClient.apply_vacant_limits
+        state = "present" if anyone_home else "vacant"
+        logger.debug("Presence state: %s", state)
+    else:
+        apply = QbittorrentClient.apply_present_limits
+        logger.debug("Home Assistant not configured, applying present limits as default")
+
     for client in qbt_clients:
         try:
-            await client.apply_present_limits()
+            await apply(client)
         except Exception:  # noqa: BLE001
             logger.warning("Failed to apply presence limits on qBittorrent instance", exc_info=True)
 
@@ -70,6 +79,7 @@ async def run_loop(config: AppConfig) -> None:
         jellyfin_clients = [JellyfinClient(cfg, session) for cfg in config.jellyfin_instances]
         dispatcharr_clients = [DispatcharrClient(cfg, session) for cfg in config.dispatcharr_instances]
         qbt_clients = [QbittorrentClient(cfg) for cfg in config.qbittorrent_instances]
+        ha_client = HomeAssistantClient(config.home_assistant)
 
         logger.info(
             "Monitoring %d Jellyfin, %d Dispatcharr, %d qBittorrent instance(s)",
@@ -92,7 +102,7 @@ async def run_loop(config: AppConfig) -> None:
             await _apply_speed_limit(qbt_clients, limit=active)
 
             if now - last_presence_check >= PRESENCE_CHECK_INTERVAL_SECONDS:
-                await _apply_presence_limits(qbt_clients)
+                await _apply_presence_limits(qbt_clients, ha_client)
                 last_presence_check = now
 
             await asyncio.sleep(LOOP_INTERVAL_SECONDS)

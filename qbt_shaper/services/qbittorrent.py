@@ -37,6 +37,9 @@ class QbittorrentClient:
 
     async def set_alt_speed_limits(self, dl_kib: int, ul_kib: int) -> None:
         """Set the alternative (throttled) speed limits in KiB/s. 0 means unlimited."""
+        # Convert dl_ for god knows why
+        dl_kib = dl_kib * 1024
+
         await asyncio.to_thread(
             self._client.app_set_preferences,
             {"alt_dl_limit": dl_kib, "alt_ul_limit": ul_kib},
@@ -62,6 +65,20 @@ class QbittorrentClient:
         )
         logger.info(
             "Set present speed limits on qBittorrent at %s: dl=%d KiB/s ul=%d KiB/s",
+            self._client.host,
+            limits.dl,
+            limits.ul,
+        )
+
+    async def apply_vacant_limits(self) -> None:
+        """Apply the configured vacant (nobody home) speed limits."""
+        limits = self._config.speed_limits.vacant
+        await asyncio.to_thread(
+            self._client.app_set_preferences,
+            {"dl_limit": limits.dl * 1024, "up_limit": limits.ul * 1024},
+        )
+        logger.info(
+            "Set vacant speed limits on qBittorrent at %s: dl=%d KiB/s ul=%d KiB/s",
             self._client.host,
             limits.dl,
             limits.ul,
