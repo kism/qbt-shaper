@@ -29,25 +29,21 @@ class DispatcharrConfig(ServiceConfig):
     """Configuration for a Dispatcharr instance."""
 
 
-class SpeedLimits(BaseModel):
-    """Download and upload speed limits in KiB/s. 0 means unlimited."""
-
-    dl: int = 0
-    ul: int = 0
-
-
-class SpeedLimitPresets(BaseModel):
-    """Speed limit presets for different occupancy states."""
-
-    vacant: SpeedLimits = SpeedLimits()
-    present: SpeedLimits = SpeedLimits()
-    streaming: SpeedLimits = SpeedLimits()
-
-
 class QbittorrentConfig(ServiceConfig):
     """Configuration for a qBittorrent instance."""
 
-    speed_limits: SpeedLimitPresets = SpeedLimitPresets()
+
+class QbittorrentSpeedConfig(BaseModel):
+    """Global speed limit configuration expressed as percentages of internet bandwidth."""
+
+    dl_max_kbps: int = 0
+    ul_max_kbps: int = 0
+    dl_streaming_percent: int = 0
+    ul_streaming_percent: int = 0
+    dl_vacant_percent: int = 0
+    ul_vacant_percent: int = 0
+    dl_present_percent: int = 0
+    ul_present_percent: int = 0
 
 
 class HomeAssistantConfig(BaseModel):
@@ -64,6 +60,7 @@ class AppConfig(BaseModel):
     jellyfin_instances: list[JellyfinConfig] = []
     dispatcharr_instances: list[DispatcharrConfig] = []
     qbittorrent_instances: list[QbittorrentConfig] = []
+    qbittorrent_speed: QbittorrentSpeedConfig = QbittorrentSpeedConfig()
     home_assistant: HomeAssistantConfig = HomeAssistantConfig()
 
 

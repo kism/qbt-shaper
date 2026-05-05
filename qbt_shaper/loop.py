@@ -78,7 +78,7 @@ async def run_loop(config: AppConfig) -> None:
     async with aiohttp.ClientSession() as session:
         jellyfin_clients = [JellyfinClient(cfg, session) for cfg in config.jellyfin_instances]
         dispatcharr_clients = [DispatcharrClient(cfg, session) for cfg in config.dispatcharr_instances]
-        qbt_clients = [QbittorrentClient(cfg) for cfg in config.qbittorrent_instances]
+        qbt_clients = [QbittorrentClient(cfg, config.qbittorrent_speed) for cfg in config.qbittorrent_instances]
         ha_client = HomeAssistantClient(config.home_assistant)
 
         logger.info(
