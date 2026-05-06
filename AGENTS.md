@@ -12,14 +12,14 @@ uv sync --all-extras
 
 ## Common Commands
 
-| Task | Command |
-|------|---------|
-| Run app | `python -m qbt_shaper` |
-| Lint (fix) | `ruff format && ruff check --fix` |
-| Type check | `mypy && ty check .` |
-| Tests | `pytest` |
-| Coverage | `coverage run && coverage report` |
-| Full CI locally | `bash scripts/run-ci-local.sh` |
+| Task            | Command                           |
+| --------------- | --------------------------------- |
+| Run app         | `python -m qbt_shaper`            |
+| Lint (fix)      | `ruff format && ruff check --fix` |
+| Type check      | `mypy && ty check .`              |
+| Tests           | `pytest`                          |
+| Coverage        | `coverage run && coverage report` |
+| Full CI locally | `bash scripts/run-ci-local.sh`    |
 
 ## Architecture
 
