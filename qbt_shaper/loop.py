@@ -2,19 +2,16 @@
 
 import asyncio
 import time
-from typing import TYPE_CHECKING
 
 import aiohttp
 
+from .config import AppConfig
 from .services.dispatcharr import DispatcharrClient
 from .services.homeassistant import HomeAssistantClient
 from .services.jellyfin import JellyfinClient
 from .services.qbittorrent import QbittorrentClient
 from .throttle import PriorityThrottler
 from .utils.logger import get_logger
-
-if TYPE_CHECKING:
-    from .config import AppConfig
 
 LOOP_INTERVAL_SECONDS = 15
 PRESENCE_CHECK_INTERVAL_SECONDS = 60

@@ -1,14 +1,12 @@
 """Dispatcharr API client."""
 
-from typing import TYPE_CHECKING, Any
 from http import HTTPStatus
+from typing import Any
 
+import aiohttp
+
+from qbt_shaper.config import DispatcharrConfig
 from qbt_shaper.utils.logger import get_logger
-
-if TYPE_CHECKING:
-    import aiohttp
-
-    from qbt_shaper.config import DispatcharrConfig
 
 logger = get_logger(__name__)
 
