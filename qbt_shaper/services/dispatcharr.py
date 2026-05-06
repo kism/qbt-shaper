@@ -10,7 +10,7 @@ from qbt_shaper.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-_TOKEN_PATH = "/api/accounts/token/"
+_TOKEN_PATH = "/api/accounts/token/"  # noqa: S105
 _TS_STATUS_PATH = "/proxy/ts/status"
 
 
