@@ -1,5 +1,6 @@
 """Jellyfin API client."""
 
+from http import HTTPStatus
 from typing import Any
 
 import aiohttp
@@ -53,7 +54,10 @@ class JellyfinClient:
         logger.info("Logged in to Jellyfin at %s", self._config.url)
 
     async def has_active_streams(self) -> bool:
-        """Return True if any session currently has a NowPlayingItem."""
+        """Return True if any session currently has a NowPlayingItem.
+
+        Re-authenticates once if the token has expired (HTTP 401).
+        """
         if self._token is None:
             await self.login()
 
@@ -61,8 +65,23 @@ class JellyfinClient:
             self._url(_SESSIONS_PATH),
             headers=self._mediabrowser_header(token=self._token),
         ) as resp:
+            if resp.status == HTTPStatus.UNAUTHORIZED:
+                logger.debug("Jellyfin token expired, re-authenticating")
+                self._token = None
+                await self.login()
+            else:
+                resp.raise_for_status()
+                sessions: list[dict[str, Any]] = await resp.json()
+                active = sum(1 for s in sessions if s.get("NowPlayingItem") is not None)
+                logger.debug("Jellyfin %s: %d active stream(s)", self._config.url, active)
+                return active > 0
+
+        async with self._session.get(
+            self._url(_SESSIONS_PATH),
+            headers=self._mediabrowser_header(token=self._token),
+        ) as resp:
             resp.raise_for_status()
-            sessions: list[dict[str, Any]] = await resp.json()
+            sessions = await resp.json()
 
         active = sum(1 for s in sessions if s.get("NowPlayingItem") is not None)
         logger.debug("Jellyfin %s: %d active stream(s)", self._config.url, active)
