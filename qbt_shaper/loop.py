@@ -10,14 +10,14 @@ from .services.dispatcharr import DispatcharrClient
 from .services.homeassistant import HomeAssistantClient
 from .services.jellyfin import JellyfinClient
 from .services.qbittorrent import QbittorrentClient
+from .throttle import PriorityThrottler
 from .utils.logger import get_logger
 
 if TYPE_CHECKING:
-    from .config import AppConfig, QbittorrentSpeedConfig
+    from .config import AppConfig
 
 LOOP_INTERVAL_SECONDS = 15
 PRESENCE_CHECK_INTERVAL_SECONDS = 60
-MAX_PRIORITY_REDUCTION = 0.8
 
 logger = get_logger(__name__)
 
@@ -64,55 +64,6 @@ async def _determine_presence(ha_client: HomeAssistantClient) -> str:
     return state
 
 
-async def _apply_priority_throttling(
-    qbt_clients: list[QbittorrentClient],
-    speed: QbittorrentSpeedConfig,
-    presence: str,
-) -> None:
-    """Apply per-instance global limits with priority-based upload throttling.
-
-    Instances are ordered by priority (index 0 = highest).  For each instance
-    the combined upload speed of all higher-priority instances is measured and
-    used to proportionally reduce that instance's upload limit, capped at
-    MAX_PRIORITY_REDUCTION.
-    """
-    ul_max_bytes = speed.ul_max_kbps * 125  # kbps → bytes/s
-
-    upload_speeds: list[int] = []
-    if ul_max_bytes > 0 and len(qbt_clients) > 1:
-        results = await asyncio.gather(
-            *[c.get_upload_speed_bytes() for c in qbt_clients],
-            return_exceptions=True,
-        )
-        for r in results:
-            upload_speeds.append(r if isinstance(r, int) else 0)
-        logger.debug(
-            "Priority throttle: upload speeds (KiB/s): %s",
-            ", ".join(f"#{j}={s // 1024}" for j, s in enumerate(upload_speeds)),
-        )
-
-    for i, client in enumerate(qbt_clients):
-        base_dl, base_ul = client.base_limit_bytes(presence)
-        if upload_speeds and i > 0:
-            combined_higher = sum(upload_speeds[:i])
-            reduction = min(combined_higher / ul_max_bytes, MAX_PRIORITY_REDUCTION)
-            logger.debug(
-                "Priority throttle #%d: combined higher-priority upload=%d KiB/s of %d KiB/s max → %.0f%% reduction",
-                i,
-                combined_higher // 1024,
-                ul_max_bytes // 1024,
-                reduction * 100,
-            )
-        else:
-            reduction = 0.0
-        throttled_ul = int(base_ul * (1 - reduction))
-        description = f"priority-throttled ({reduction:.0%} reduction)" if reduction else presence
-        try:
-            await client._apply_global_limits(description, base_dl, throttled_ul)  # noqa: SLF001
-        except Exception:  # noqa: BLE001
-            logger.warning("Failed to apply limits on qBittorrent instance", exc_info=True)
-
-
 async def run_loop(config: AppConfig) -> None:
     """Run the main monitoring and control loop."""
     async with aiohttp.ClientSession() as session:
@@ -127,6 +78,8 @@ async def run_loop(config: AppConfig) -> None:
             len(dispatcharr_clients),
             len(qbt_clients),
         )
+
+        throttler = PriorityThrottler(qbt_clients, config.qbittorrent_speed)
 
         for client in qbt_clients:
             await client.login()
@@ -145,6 +98,6 @@ async def run_loop(config: AppConfig) -> None:
                 current_presence = await _determine_presence(ha_client)
                 last_presence_check = now
 
-            await _apply_priority_throttling(qbt_clients, config.qbittorrent_speed, current_presence)
+            await throttler.apply(current_presence)
 
             await asyncio.sleep(LOOP_INTERVAL_SECONDS)

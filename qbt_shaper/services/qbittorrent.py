@@ -25,6 +25,7 @@ class QbittorrentClient:
 
     def __init__(self, config: QbittorrentConfig, speed: QbittorrentSpeedConfig) -> None:
         self._speed = speed
+        self.priority: int = config.priority
         self._client = qbittorrentapi.Client(
             host=config.url,
             username=config.username,
