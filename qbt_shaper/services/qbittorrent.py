@@ -15,6 +15,8 @@ else:
 
 logger = get_logger(__name__)
 
+_SPEED_CHANGE_THRESHOLD = 0.02  # skip update if new value is within 2% of last applied
+
 
 class QbittorrentClient:
     """Client for the qBittorrent WebUI API.
@@ -86,8 +88,12 @@ class QbittorrentClient:
         await self.set_alt_speed_limits(dl_kib=dl // 1024, ul_kib=ul // 1024)
 
     async def _apply_global_limits(self, description: str, dl_bytes: int, ul_bytes: int) -> None:
-        if self._applied_global == (dl_bytes, ul_bytes):
-            return
+        if self._applied_global is not None:
+            applied_dl, applied_ul = self._applied_global
+            dl_change = abs(dl_bytes - applied_dl) / max(applied_dl, 1)
+            ul_change = abs(ul_bytes - applied_ul) / max(applied_ul, 1)
+            if dl_change <= _SPEED_CHANGE_THRESHOLD and ul_change <= _SPEED_CHANGE_THRESHOLD:
+                return
         await asyncio.to_thread(
             self._client.app_set_preferences,
             {"dl_limit": dl_bytes, "up_limit": ul_bytes},

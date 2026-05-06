@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 MAX_PRIORITY_REDUCTION = 0.8
 SPEED_HISTORY_SIZE = 10
+_MIN_DISPLAY_REDUCTION = 0.005  # reductions below this round to 0% in format strings
 
 logger = get_logger(__name__)
 
@@ -82,7 +83,7 @@ class PriorityThrottler:
             for _, client in group:
                 base_dl, base_ul = client.base_limit_bytes(presence)
                 throttled_ul = int(base_ul * (1 - reduction))
-                description = f"priority-throttled ({reduction:.0%} reduction)" if reduction else presence
+                description = f"priority-throttled ({reduction:.0%} reduction)" if reduction >= _MIN_DISPLAY_REDUCTION else presence
                 try:
                     await client._apply_global_limits(description, base_dl, throttled_ul)  # noqa: SLF001
                 except Exception:  # noqa: BLE001
