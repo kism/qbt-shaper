@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from collections import deque
 from typing import TYPE_CHECKING
 
 from .services.qbittorrent import QbittorrentClient
@@ -11,6 +12,7 @@ if TYPE_CHECKING:
     from .config import QbittorrentSpeedConfig
 
 MAX_PRIORITY_REDUCTION = 0.8
+SPEED_HISTORY_SIZE = 10
 
 logger = get_logger(__name__)
 
@@ -29,6 +31,11 @@ class PriorityThrottler:
         self._clients = clients
         self._ul_max_bytes = speed.ul_max_kbps * 125  # kbps → bytes/s
 
+        # Per-client upload speed history (bytes/s), capped at SPEED_HISTORY_SIZE readings.
+        self._speed_history: list[deque[int]] = [
+            deque(maxlen=SPEED_HISTORY_SIZE) for _ in clients
+        ]
+
         # Group clients (with their original index) by priority level.
         self._groups: dict[int, list[tuple[int, QbittorrentClient]]] = {}
         for i, client in enumerate(clients):
@@ -43,9 +50,12 @@ class PriorityThrottler:
                 *[c.get_upload_speed_bytes() for c in self._clients],
                 return_exceptions=True,
             )
-            upload_speeds.extend(r if isinstance(r, int) else 0 for r in results)
+            for j, r in enumerate(results):
+                sample = r if isinstance(r, int) else 0
+                self._speed_history[j].append(sample)
+                upload_speeds.append(max(self._speed_history[j]))
             logger.debug(
-                "Priority throttle: upload speeds (KiB/s): %s",
+                "Priority throttle: peak upload speeds (KiB/s): %s",
                 ", ".join(f"#{j}={s // 1024}" for j, s in enumerate(upload_speeds)),
             )
 
