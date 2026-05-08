@@ -33,9 +33,7 @@ class PriorityThrottler:
         self._ul_max_bytes = speed.ul_max_kbps * 125  # kbps → bytes/s
 
         # Per-client upload speed history (bytes/s), capped at SPEED_HISTORY_SIZE readings.
-        self._speed_history: list[deque[int]] = [
-            deque(maxlen=SPEED_HISTORY_SIZE) for _ in clients
-        ]
+        self._speed_history: list[deque[int]] = [deque(maxlen=SPEED_HISTORY_SIZE) for _ in clients]
 
         # Group clients (with their original index) by priority level.
         self._groups: dict[int, list[tuple[int, QbittorrentClient]]] = {}
@@ -83,7 +81,11 @@ class PriorityThrottler:
             for _, client in group:
                 base_dl, base_ul = client.base_limit_bytes(presence)
                 throttled_ul = int(base_ul * (1 - reduction))
-                description = f"priority-throttled ({reduction:.0%} reduction)" if reduction >= _MIN_DISPLAY_REDUCTION else presence
+                description = (
+                    f"priority-throttled ({reduction:.0%} reduction)"
+                    if reduction >= _MIN_DISPLAY_REDUCTION
+                    else presence
+                )
                 try:
                     await client._apply_global_limits(description, base_dl, throttled_ul)  # noqa: SLF001
                 except Exception:  # noqa: BLE001

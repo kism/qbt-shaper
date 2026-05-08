@@ -26,13 +26,16 @@ class HomeAssistantClient:
 
     async def any_entity_home(self) -> bool:
         """Return True if any of the configured presence entities reports state 'home'."""
-        async with AsyncClient(self._config.url, self._config.token) as client:
-            for entity_id in self._config.presence_entities:
-                try:
-                    state = await client.get_state(entity_id=entity_id)
-                    if state.state == "home":
-                        logger.debug("Entity %s is home", entity_id)
-                        return True
-                except Exception:  # noqa: BLE001
-                    logger.warning("Failed to get state for entity %s", entity_id, exc_info=True)
+        try:
+            async with AsyncClient(self._config.url, self._config.token) as client:
+                for entity_id in self._config.presence_entities:
+                    try:
+                        state = await client.get_state(entity_id=entity_id)
+                        if state.state == "home":
+                            logger.debug("Entity %s is home", entity_id)
+                            return True
+                    except Exception:  # noqa: BLE001
+                        logger.warning("Failed to get state for entity %s", entity_id, exc_info=True)
+        except Exception:
+            logger.error("Failed to connect to Home Assistant at %s", self._config.url, exc_info=True)
         return False

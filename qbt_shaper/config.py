@@ -92,4 +92,3 @@ def write_config(config: AppConfig, config_path: Path = DEFAULT_CONFIG_PATH) -> 
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(config.model_dump_json(indent=2), encoding="utf-8")
     logger.debug("Wrote config to %s", config_path)
-
