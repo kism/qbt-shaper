@@ -94,10 +94,14 @@ async def run_loop(config: AppConfig) -> None:
             if active:
                 last_stream_active = now
 
-            in_cooldown = last_stream_active is not None and now - last_stream_active < STREAM_COOLDOWN_SECONDS
-            if in_cooldown and not active:
-                remaining = int(STREAM_COOLDOWN_SECONDS - (now - last_stream_active))
-                logger.debug("Stream cooldown active, %ds remaining before releasing throttle", remaining)
+            if not active and last_stream_active is not None:
+                elapsed = now - last_stream_active
+                in_cooldown = elapsed < STREAM_COOLDOWN_SECONDS
+                if in_cooldown:
+                    remaining = int(STREAM_COOLDOWN_SECONDS - elapsed)
+                    logger.debug("Stream cooldown active, %ds remaining before releasing throttle", remaining)
+            else:
+                in_cooldown = False
 
             await _apply_speed_limit(qbt_clients, limit=active or in_cooldown)
 
