@@ -15,6 +15,7 @@ from .utils.logger import get_logger
 
 LOOP_INTERVAL_SECONDS = 15
 PRESENCE_CHECK_INTERVAL_SECONDS = 60
+STREAM_COOLDOWN_SECONDS = 600  # 10 minutes
 
 logger = get_logger(__name__)
 
@@ -84,12 +85,21 @@ async def run_loop(config: AppConfig) -> None:
 
         current_presence = "present"
         last_presence_check = time.monotonic() - PRESENCE_CHECK_INTERVAL_SECONDS
+        last_stream_active: float | None = None
 
         while True:
             now = time.monotonic()
 
             active = await _check_active_streams(jellyfin_clients, dispatcharr_clients)
-            await _apply_speed_limit(qbt_clients, limit=active)
+            if active:
+                last_stream_active = now
+
+            in_cooldown = last_stream_active is not None and now - last_stream_active < STREAM_COOLDOWN_SECONDS
+            if in_cooldown and not active:
+                remaining = int(STREAM_COOLDOWN_SECONDS - (now - last_stream_active))
+                logger.debug("Stream cooldown active, %ds remaining before releasing throttle", remaining)
+
+            await _apply_speed_limit(qbt_clients, limit=active or in_cooldown)
 
             if now - last_presence_check >= PRESENCE_CHECK_INTERVAL_SECONDS:
                 current_presence = await _determine_presence(ha_client)
