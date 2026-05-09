@@ -99,7 +99,7 @@ async def run_loop(config: AppConfig) -> None:
                 in_cooldown = elapsed < STREAM_COOLDOWN_SECONDS
                 if in_cooldown:
                     remaining = int(STREAM_COOLDOWN_SECONDS - elapsed)
-                    logger.debug("Stream cooldown active, %ds remaining before releasing throttle", remaining)
+                    logger.info("Stream cooldown active, %ds remaining before releasing throttle", remaining)
             else:
                 in_cooldown = False
 
