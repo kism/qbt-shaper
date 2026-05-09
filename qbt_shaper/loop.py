@@ -95,6 +95,11 @@ async def run_loop(config: AppConfig) -> None:
                 current_presence = await _determine_presence(ha_client)
                 last_presence_check = now
 
-            await throttler.apply(current_presence)
+            effective_presence = current_presence
+            if config.bedtime.is_active():
+                effective_presence = "vacant"
+                logger.debug("Bedtime active, overriding presence '%s' → 'vacant'", current_presence)
+
+            await throttler.apply(effective_presence)
 
             await asyncio.sleep(LOOP_INTERVAL_SECONDS)
