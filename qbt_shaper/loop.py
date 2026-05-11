@@ -2,6 +2,8 @@
 
 import asyncio
 import time
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import aiohttp
 
@@ -13,11 +15,32 @@ from .services.qbittorrent import QbittorrentClient
 from .throttle import PriorityThrottler
 from .utils.logger import get_logger
 
+if TYPE_CHECKING:
+    from logging import Logger
+else:
+    Logger = object
+
 LOOP_INTERVAL_SECONDS = 15
 PRESENCE_CHECK_INTERVAL_SECONDS = 60
 STREAM_COOLDOWN_SECONDS = 600  # 10 minutes
 
+
 logger = get_logger(__name__)
+
+
+@dataclass
+class _LoopState:
+    someone_streaming: bool
+    someone_home: bool
+    bed_time: bool
+
+    def log_state(self, logger: Logger) -> None:
+        logger.info(
+            "New state: streaming=%s, someone_home=%s, bed_time=%s",
+            str(self.someone_streaming).lower(),
+            str(self.someone_home).lower(),
+            str(self.bed_time).lower(),
+        )
 
 
 async def _check_active_streams(
@@ -86,6 +109,7 @@ async def run_loop(config: AppConfig) -> None:
         current_presence = "present"
         last_presence_check = time.monotonic() - PRESENCE_CHECK_INTERVAL_SECONDS
         last_stream_active: float | None = None
+        last_logged_state: _LoopState | None = None
 
         while True:
             now = time.monotonic()
@@ -109,11 +133,21 @@ async def run_loop(config: AppConfig) -> None:
                 current_presence = await _determine_presence(ha_client)
                 last_presence_check = now
 
+            bedtime = config.bedtime.is_active()
             effective_presence = current_presence
-            if config.bedtime.is_active():
+            if bedtime:
                 effective_presence = "vacant"
                 logger.debug("Bedtime active, overriding presence '%s' → 'vacant'", current_presence)
 
             await throttler.apply(effective_presence)
+
+            current_state = _LoopState(
+                someone_streaming=active,
+                someone_home=current_presence == "present",
+                bed_time=bedtime,
+            )
+            if current_state != last_logged_state:
+                current_state.log_state(logger)
+                last_logged_state = current_state
 
             await asyncio.sleep(LOOP_INTERVAL_SECONDS)
