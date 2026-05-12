@@ -1,5 +1,7 @@
 """Main application loop."""
 
+from __future__ import annotations
+
 import asyncio
 import time
 from dataclasses import dataclass
@@ -8,7 +10,6 @@ from typing import TYPE_CHECKING
 
 import aiohttp
 
-from .config import AppConfig
 from .constants import OUR_TIMEZONE
 from .services.dispatcharr import DispatcharrClient
 from .services.homeassistant import HomeAssistantClient
@@ -19,8 +20,8 @@ from .utils.logger import get_logger
 
 if TYPE_CHECKING:
     from logging import Logger
-else:
-    Logger = object
+
+    from .config import AppConfig
 
 LOOP_INTERVAL_SECONDS = 15
 PRESENCE_CHECK_INTERVAL_SECONDS = 60
@@ -71,11 +72,13 @@ async def _apply_speed_limit(
     limit: bool,
 ) -> None:
     """Enable or disable speed limiting on all configured qBittorrent instances."""
-    for client in qbt_clients:
-        try:
-            await client.set_speed_limit_enabled(enabled=limit)
-        except Exception:  # noqa: BLE001
-            logger.warning("Failed to set speed limit on qBittorrent instance", exc_info=True)
+    results = await asyncio.gather(
+        *[client.set_speed_limit_enabled(enabled=limit) for client in qbt_clients],
+        return_exceptions=True,
+    )
+    for result in results:
+        if isinstance(result, Exception):
+            logger.warning("Failed to set speed limit on qBittorrent instance", exc_info=result)
 
 
 async def _determine_presence(ha_client: HomeAssistantClient) -> str:
