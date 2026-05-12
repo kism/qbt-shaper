@@ -3,11 +3,13 @@
 import asyncio
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 import aiohttp
 
 from .config import AppConfig
+from .constants import OUR_TIMEZONE
 from .services.dispatcharr import DispatcharrClient
 from .services.homeassistant import HomeAssistantClient
 from .services.jellyfin import JellyfinClient
@@ -35,8 +37,10 @@ class _LoopState:
     bed_time: bool
 
     def log_state(self, logger: Logger) -> None:
+        current_time_nice = datetime.now(tz=OUR_TIMEZONE).strftime("%Y-%m-%d %H:%M:%S %Z")
         logger.info(
-            "New state: streaming=%s, someone_home=%s, bed_time=%s",
+            "New state at %s: streaming=%s, someone_home=%s, bed_time=%s",
+            current_time_nice,
             str(self.someone_streaming).lower(),
             str(self.someone_home).lower(),
             str(self.bed_time).lower(),

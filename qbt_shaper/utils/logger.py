@@ -1,6 +1,7 @@
 """Setup the logger functionality."""
 
 import logging
+import os
 import typing
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -21,8 +22,12 @@ LOG_LEVELS = [
 ]  # Valid str logging levels.
 
 # This is the logging message format that I like.
+SIMPLE_LOG_FORMAT = "%(levelname)s:%(message)s"
+SIMPLE_LOG_FORMAT_DEBUG = "%(levelname)s:%(name)s:%(message)s"
 FILE_LOG_FORMAT = "%(levelname)s:%(name)s:%(message)s"
 TRACE_LEVEL_NUM = 5
+
+USE_SIMPLE_LOGGING: bool = os.getenv("SIMPLE_LOGGING", "0").lower() in ("1", "true", "yes")
 
 
 class CustomLogger(logging.Logger):
@@ -41,6 +46,17 @@ logging.setLoggerClass(CustomLogger)
 # This is where we log to in this module, following the standard of every module.
 # I don't use the function so we can have this at the top
 logger = cast("CustomLogger", logging.getLogger(__name__))
+
+
+def _get_log_level_int(level: str | int) -> int:
+    """Get the log level as an int."""
+    if isinstance(level, int):
+        return level
+
+    level = level.upper()
+    if level == "TRACE":
+        return TRACE_LEVEL_NUM
+    return getattr(logging, level, logging.INFO)
 
 
 def setup_logger_cli(
@@ -71,14 +87,16 @@ def setup_logger(
         log_path: Path to log to.
         in_logger: Logger to configure, useful for testing.
     """
+    log_level_int = _get_log_level_int(log_level)
+
     if not in_logger:  # in_logger should only exist when testing with PyTest.
         in_logger = logging.getLogger()  # Get the root logger
 
     # If the logger doesn't have a console handler (root logger doesn't by default)
     if not any(isinstance(handler, (RichHandler, logging.StreamHandler)) for handler in in_logger.handlers):
-        _add_console_handler(in_logger)
+        _add_console_handler(in_logger=in_logger, log_level_int=log_level_int)
 
-    _set_log_level(in_logger, log_level)
+    in_logger.setLevel(log_level_int)
 
     # If we are logging to a file
     if not any(isinstance(handler, logging.FileHandler) for handler in in_logger.handlers) and log_path:
@@ -92,29 +110,27 @@ def get_logger(name: str) -> CustomLogger:
     return cast("CustomLogger", logging.getLogger(name))
 
 
-def _add_console_handler(in_logger: logging.Logger) -> None:
+def _add_console_handler(in_logger: logging.Logger, log_level_int: int) -> None:
     """Add a console handler to the logger."""
-    console = Console(theme=Theme({"logging.level.trace": "dim"}))
+    if not USE_SIMPLE_LOGGING:
+        console = Console(theme=Theme({"logging.level.trace": "dim"}))
 
-    console_handler = RichHandler(console=console, show_time=False, rich_tracebacks=True, highlighter=NullHighlighter())
-    in_logger.addHandler(console_handler)
-
-
-def _set_log_level(in_logger: logging.Logger, log_level: int | str) -> None:
-    """Set the log level of the logger."""
-    if isinstance(log_level, str):
-        log_level = log_level.upper()
-        if log_level not in LOG_LEVELS:
-            in_logger.setLevel("INFO")
-            logger.warning(
-                "❗ Invalid logging level: %s, defaulting to INFO",
-                log_level,
-            )
-        else:
-            in_logger.setLevel(log_level)
-            logger.debug("Set log level: %s", log_level)
+        console_handler_rich = RichHandler(
+            console=console,
+            show_time=False,
+            rich_tracebacks=True,
+            highlighter=NullHighlighter(),
+        )
+        in_logger.addHandler(console_handler_rich)
     else:
-        in_logger.setLevel(log_level)
+        console_handler = logging.StreamHandler()
+        if log_level_int <= TRACE_LEVEL_NUM:
+            formatter = logging.Formatter(SIMPLE_LOG_FORMAT_DEBUG)
+        else:
+            formatter = logging.Formatter(SIMPLE_LOG_FORMAT)
+
+        console_handler.setFormatter(formatter)
+        in_logger.addHandler(console_handler)
 
 
 def _add_file_handler(in_logger: logging.Logger, log_path: Path) -> None:
