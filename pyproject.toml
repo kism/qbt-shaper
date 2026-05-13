@@ -12,7 +12,6 @@ dependencies = [
     "pydantic-settings>=2.14.0",
     "python-dotenv>=1.2.2",
     "qbittorrent-api>=2026.5.0",
-    "rich>=14.3.0",
 ]
 
 [project.optional-dependencies]
@@ -62,6 +61,7 @@ ignore = [
     "COM812", # conflict in the formatter
     "D",      # Don't care about docstrings
     "G201",   # Happy to log exceptions as errors
+    "TRY400", # Fine to log web exceptions as errors
 ]
 
 [tool.ruff.lint.per-file-ignores]

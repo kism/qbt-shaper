@@ -34,8 +34,8 @@ class HomeAssistantClient:
                         if state.state == "home":
                             logger.debug("Entity %s is home", entity_id)
                             return True
-                    except Exception:  # noqa: BLE001
-                        logger.warning("Failed to get state for entity %s", entity_id, exc_info=True)
-        except Exception:
-            logger.error("Failed to connect to Home Assistant at %s", self._config.url, exc_info=True)
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning("Failed to get state for entity %s: %s", entity_id, type(e).__name__)
+        except Exception as e:  # noqa: BLE001
+            logger.error("Failed to connect to Home Assistant at %s: %s", self._config.url, type(e).__name__)
         return False

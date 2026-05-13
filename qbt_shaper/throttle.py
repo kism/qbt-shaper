@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from .config import QbittorrentSpeedConfig
 
 MAX_PRIORITY_REDUCTION = 0.8
+PRIORITY_REDUCTION_PENALTY = 1.1  # extra factor applied to higher-priority upload when reducing lower-priority caps
 SPEED_HISTORY_SIZE = 10
 _MIN_DISPLAY_REDUCTION = 0.005  # reductions below this round to 0% in format strings
 
@@ -62,7 +63,10 @@ class PriorityThrottler:
         for level in self._sorted_levels:
             group = self._groups[level]
             if upload_speeds and cumulative_upload > 0:
-                reduction = min(cumulative_upload / self._ul_max_bytes, MAX_PRIORITY_REDUCTION)
+                reduction = min(
+                    cumulative_upload * PRIORITY_REDUCTION_PENALTY / self._ul_max_bytes,
+                    MAX_PRIORITY_REDUCTION,
+                )
                 logger.log(
                     logging.DEBUG if reduction > 0 else logging.INFO,
                     "Priority throttle level %d: higher-priority upload=%d KiB/s of %d KiB/s max → %.0f%% reduction",

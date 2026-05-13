@@ -4,14 +4,11 @@ import argparse
 import asyncio
 from pathlib import Path
 
-from rich import traceback
-
 from .config import DEFAULT_CONFIG_PATH, load_config, write_config
 from .constants import PROGRAM_NAME, PROGRAM_NAME_WITH_VERSION
 from .loop import run_loop
 from .utils.logger import get_logger, setup_logger_cli
 
-traceback.install(extra_lines=2)
 logger = get_logger(__name__)
 
 
