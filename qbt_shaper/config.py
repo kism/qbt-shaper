@@ -1,6 +1,7 @@
 """Configuration loading from a JSON file."""
 
 import json
+import os
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -10,6 +11,8 @@ from pydantic import BaseModel, Field, field_validator
 from .utils.logger import get_logger
 
 DEFAULT_CONFIG_PATH = Path.home() / ".config" / "qbt-shaper" / "config.json"
+if os.environ.get("QBT_SHAPER_CONFIG_PATH"):
+    DEFAULT_CONFIG_PATH = Path(os.environ["QBT_SHAPER_CONFIG_PATH"])
 
 
 logger = get_logger(__name__)
@@ -155,7 +158,7 @@ def load_config(config_path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
         )
         return default
 
-    logger.debug("Loading config from %s", config_path)
+    logger.info("Loading config from %s", config_path)
     raw = json.loads(config_path.read_text(encoding="utf-8"))
     return AppConfig.model_validate(raw)
 
