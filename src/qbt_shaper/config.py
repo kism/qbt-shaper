@@ -77,6 +77,9 @@ class QbittorrentConfig(ServiceConfig):
     priority: int = 1
     """Throttling priority. Lower number = higher priority. Instances at the same level are peers."""
 
+    force_recheck_errored: bool = False
+    """Periodically force a recheck of all torrents in an errored state."""
+
 
 class QbittorrentSpeedConfig(BaseModel):
     """Global speed limit configuration expressed as percentages of internet bandwidth."""

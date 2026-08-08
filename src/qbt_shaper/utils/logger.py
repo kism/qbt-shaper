@@ -3,8 +3,10 @@
 import logging
 import typing
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
 from typing import cast
+
+if typing.TYPE_CHECKING:
+    from pathlib import Path
 
 LOG_LEVELS = [
     "TRACE",

@@ -34,15 +34,13 @@ Repository = "https://github.com/kism/python-boilerplate"
 requires = ["uv_build>=0.11.0,<0.12.0"]
 build-backend = "uv_build"
 
-[tool.uv.build-backend]
-module-root = ""
+
 
 [project.scripts]
 qbt-shaper = "qbt_shaper:__main__.main"
 
 [tool.ruff]
 cache-dir = "~/.cache/ruff"
-target-version = "py312"
 line-length = 120
 
 [tool.ruff.lint]
@@ -113,20 +111,3 @@ sort = "-Miss"
 
 [tool.coverage.html]
 show_contexts = true
-
-[tool.mypy]
-files = ["qbt_shaper", "tests"]
-show_error_codes = true
-strict = true
-enable_error_code = [
-    "ignore-without-code",
-    "redundant-expr",
-    "truthy-bool",
-    "type-arg",
-    "unused-awaitable",
-    "possibly-undefined",
-    "redundant-self",
-]
-warn_unreachable = true
-warn_redundant_casts = true
-warn_no_return = true

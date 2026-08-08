@@ -28,6 +28,7 @@ class QbittorrentClient:
     def __init__(self, config: QbittorrentConfig, speed: QbittorrentSpeedConfig) -> None:
         self._speed = speed
         self.priority: int = config.priority
+        self.force_recheck_errored: bool = config.force_recheck_errored
         self._client = qbittorrentapi.Client(
             host=config.url,
             username=config.username,
@@ -121,6 +122,21 @@ class QbittorrentClient:
             "vacant",
             self._kbps_percent_to_bytes(self._speed.dl_max_kbps, self._speed.dl_vacant_percent),
             self._kbps_percent_to_bytes(self._speed.ul_max_kbps, self._speed.ul_vacant_percent),
+        )
+
+    async def recheck_errored(self) -> None:
+        """Force a recheck of all torrents in an errored state, if enabled for this instance."""
+        if not self.force_recheck_errored:
+            return
+        torrents = await asyncio.to_thread(self._client.torrents_info, status_filter="errored")
+        hashes = [t.hash for t in torrents]
+        if not hashes:
+            return
+        await asyncio.to_thread(self._client.torrents_recheck, torrent_hashes=hashes)
+        logger.info(
+            "Forced recheck of %d errored torrent(s) on qBittorrent at %s",
+            len(hashes),
+            self._client.host,
         )
 
     async def set_speed_limit_enabled(self, *, enabled: bool) -> None:

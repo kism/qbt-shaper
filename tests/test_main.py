@@ -1,7 +1,7 @@
 import argparse
 import logging
 
-import pytest
+import pytest  # noqa: TC002
 
 from qbt_shaper import __main__
 

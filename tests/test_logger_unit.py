@@ -1,7 +1,6 @@
 """Logger unit tests."""
 
 import logging
-from collections.abc import Generator
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -16,13 +15,15 @@ from qbt_shaper.utils.logger import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from pytest_mock import MockerFixture
 else:
     MockerFixture = object
 
 
 @pytest.fixture
-def logger() -> Generator[logging.Logger, None, None]:
+def logger() -> Generator[logging.Logger]:
     """Logger to use in unit tests, including cleanup."""
     logger = logging.getLogger("TEST_LOGGER")
 

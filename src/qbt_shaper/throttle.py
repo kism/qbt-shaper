@@ -5,11 +5,11 @@ import logging
 from collections import deque
 from typing import TYPE_CHECKING
 
-from .services.qbittorrent import QbittorrentClient
 from .utils.logger import get_logger
 
 if TYPE_CHECKING:
     from .config import QbittorrentSpeedConfig
+    from .services.qbittorrent import QbittorrentClient
 
 MAX_PRIORITY_REDUCTION = 0.8
 PRIORITY_REDUCTION_PENALTY = 1.1  # extra factor applied to higher-priority upload when reducing lower-priority caps
@@ -29,7 +29,7 @@ class PriorityThrottler:
     priority group are treated as peers and do not throttle each other.
     """
 
-    def __init__(self, clients: list[QbittorrentClient], speed: "QbittorrentSpeedConfig") -> None:
+    def __init__(self, clients: list[QbittorrentClient], speed: QbittorrentSpeedConfig) -> None:
         self._clients = clients
         self._ul_max_bytes = speed.ul_max_kbps * 125  # kbps → bytes/s
 

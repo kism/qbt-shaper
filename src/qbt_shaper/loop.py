@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 LOOP_INTERVAL_SECONDS = 15
 PRESENCE_CHECK_INTERVAL_SECONDS = 60
 STREAM_COOLDOWN_SECONDS = 180  # 3 minutes
+ERRORED_RECHECK_INTERVAL_SECONDS = 900  # 15 minutes
 
 
 logger = get_logger(__name__)
@@ -81,6 +82,17 @@ async def _apply_speed_limit(
             logger.warning("Failed to set speed limit on qBittorrent instance", exc_info=result)
 
 
+async def _recheck_errored_torrents(qbt_clients: list[QbittorrentClient]) -> None:
+    """Force a recheck of errored torrents on all instances that have it enabled."""
+    results = await asyncio.gather(
+        *[client.recheck_errored() for client in qbt_clients],
+        return_exceptions=True,
+    )
+    for result in results:
+        if isinstance(result, Exception):
+            logger.warning("Errored-torrent recheck failed", exc_info=result)
+
+
 async def _determine_presence(ha_client: HomeAssistantClient) -> str:
     """Return 'present' or 'vacant' based on Home Assistant presence state."""
     if not ha_client.is_configured():
@@ -115,6 +127,7 @@ async def run_loop(config: AppConfig) -> None:
 
         current_presence = "present"
         last_presence_check = time.monotonic() - PRESENCE_CHECK_INTERVAL_SECONDS
+        last_errored_recheck = time.monotonic() - ERRORED_RECHECK_INTERVAL_SECONDS
         last_stream_active: float | None = None
         last_logged_state: _LoopState | None = None
 
@@ -139,6 +152,10 @@ async def run_loop(config: AppConfig) -> None:
             if now - last_presence_check >= PRESENCE_CHECK_INTERVAL_SECONDS:
                 current_presence = await _determine_presence(ha_client)
                 last_presence_check = now
+
+            if now - last_errored_recheck >= ERRORED_RECHECK_INTERVAL_SECONDS:
+                await _recheck_errored_torrents(qbt_clients)
+                last_errored_recheck = now
 
             bedtime = config.bedtime.is_active()
             effective_presence = current_presence
