@@ -11,7 +11,6 @@ from qbt_shaper.utils.logger import (
     TRACE_LEVEL_NUM,
     CustomLogger,
     _add_file_handler,
-    _set_log_level,
     setup_logger,
     setup_logger_cli,
 )
@@ -93,26 +92,6 @@ def test_handler_file_added(logger: CustomLogger, tmp_path: Path) -> None:
         ("TRACE", TRACE_LEVEL_NUM),
     ],
 )
-def test_set_log_level(
-    log_level_in: str | int,
-    log_level_expected: int,
-    logger: CustomLogger,
-) -> None:
-    _set_log_level(logger, log_level_in)
-    assert logger.getEffectiveLevel() == log_level_expected
-
-
-def test_trace_level(logger: CustomLogger, caplog: pytest.LogCaptureFixture) -> None:
-    _set_log_level(logger, "TRACE")
-
-    assert logger.getEffectiveLevel() == TRACE_LEVEL_NUM
-
-    with caplog.at_level(TRACE_LEVEL_NUM):
-        logger.trace("Test trace")
-
-    assert "Test trace" in caplog.text
-
-
 @pytest.mark.parametrize(
     ("verbosity", "expected_level"),
     [

@@ -92,5 +92,5 @@ class PriorityThrottler:
                 )
                 try:
                     await client._apply_global_limits(description, base_dl, throttled_ul)  # noqa: SLF001
-                except Exception:  # noqa: BLE001
+                except Exception:
                     logger.warning("Failed to apply limits on qBittorrent instance", exc_info=True)

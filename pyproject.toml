@@ -4,7 +4,7 @@ version = "0.0.1"
 description = ""
 authors = []
 readme = "README.md"
-requires-python = ">=3.12.0,<4"
+requires-python = ">=3.14.0,<4"
 dependencies = [
     "aiohttp>=3.13.5",
     "homeassistant-api>=6.0.0",
@@ -15,12 +15,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-type = ["mypy>=1.19.0", "ty>=0.0.23"]
+type = ["ty>=0.0.69"]
 
-lint = ["ruff>=0.15.6"]
+lint = ["ruff>=0.16.0"]
 
 test = [
-    "pytest>=9.0.0",
+    "pytest>=9.1.0",
     "coverage>=7.13.0",
     "pytest-mock",
     "pytest-random-order",
@@ -53,6 +53,7 @@ ignore = [
     "AIR",  # Airflow not required
     "FAST", # FastAPI not required
     "DTZ",  # no need to specify timezone for time objects
+    "CPY",  # no need to specify copyright notice in every file
 
     # Specific rules
     "TD002",  # Verbose TODO, only I work on this project
