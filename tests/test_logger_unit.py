@@ -84,16 +84,6 @@ def test_handler_file_added(logger: CustomLogger, tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("log_level_in", "log_level_expected"),
-    [
-        (50, 50),
-        ("INFO", 20),
-        ("WARNING", 30),
-        ("INVALID", 20),
-        ("TRACE", TRACE_LEVEL_NUM),
-    ],
-)
-@pytest.mark.parametrize(
     ("verbosity", "expected_level"),
     [
         (0, logging.INFO),  # <no -v>

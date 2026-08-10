@@ -41,4 +41,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()  # pragma: no cover
+    try:
+        main()  # pragma: no cover
+    except KeyboardInterrupt:
+        logger.info("Goodbye!")

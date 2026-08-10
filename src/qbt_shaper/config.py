@@ -152,14 +152,8 @@ def load_config(config_path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
     If the file does not exist, write a default config and return it.
     """
     if not config_path.exists():
-        logger.info("Config file not found at %s, writing default config", config_path)
-        default = AppConfig()
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text(
-            default.model_dump_json(indent=2),
-            encoding="utf-8",
-        )
-        return default
+        logger.info("Config file not found at %s, using defaults", config_path)
+        return AppConfig()
 
     logger.info("Loading config from %s", config_path)
     raw = json.loads(config_path.read_text(encoding="utf-8"))

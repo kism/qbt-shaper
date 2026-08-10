@@ -9,15 +9,13 @@ dependencies = [
     "aiohttp>=3.13.5",
     "homeassistant-api>=6.0.0",
     "pydantic>=2.13.3",
-    "pydantic-settings>=2.14.0",
-    "python-dotenv>=1.2.2",
     "qbittorrent-api>=2026.5.0",
 ]
 
 [project.optional-dependencies]
 type = ["ty>=0.0.69"]
 
-lint = ["ruff>=0.16.0"]
+lint = ["ruff>=0.16.2"]
 
 test = [
     "pytest>=9.1.0",
@@ -28,7 +26,7 @@ test = [
 ]
 
 [project.urls]
-Repository = "https://github.com/kism/python-boilerplate"
+Repository = "https://github.com/kism/qbt-shaper"
 
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]
@@ -77,6 +75,7 @@ ignore = [
     "PT004",   # monkeypatch doesn't return.
     "S311",    # I'll assume no real crypto will be done in PyTest.
     "S105",    # Hardcoded fake passwords are fine in tests.
+    "S106",    # Hardcoded fake passwords as arguments are fine in tests.
     "PLR0913", # Tests can have as many arguments as they want.
     "BLE001",  # Tests can use BaseException.
     "S311",    # Regular RNG is fine in tests.
