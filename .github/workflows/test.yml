@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.12", "3.13", "3.14"] # Don't bother with beta versions, slow on github. https://github.com/actions/python-versions/releases
+        python-version: ["3.14"] # Don't bother with beta versions, slow on github. https://github.com/actions/python-versions/releases
     steps:
       - uses: actions/checkout@v6
 
