@@ -38,4 +38,4 @@ jobs:
         run: uv build
 
       - name: Run the built project to check it works
-        run: qbt-shaper --help
+        run: uv run qbt-shaper --help
