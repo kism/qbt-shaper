@@ -169,7 +169,7 @@ def load_config(config_path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
     logger.info("Config path %s, from %s", config_path, source)
 
     if not config_path.exists():
-        logger.warning("Config file not found, using defaults from %s", source)
+        logger.warning("Config file not found, using defaults from %s (source: %s)", DEFAULT_CONFIG_PATH, source)
         return AppConfig()
 
     raw = json.loads(config_path.read_text(encoding="utf-8"))
