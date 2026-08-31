@@ -2,13 +2,3 @@
 
 Fixtures defined in a conftest.py can be used by any test in that package without needing to import them.
 """
-
-import pytest
-
-from qbt_shaper.my_cool_object import MyCoolObject
-
-
-@pytest.fixture
-def my_cool_object() -> MyCoolObject:
-    """Fixture for MyCoolObject."""
-    return MyCoolObject("Hello, World!")

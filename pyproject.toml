@@ -4,20 +4,21 @@ version = "0.0.1"
 description = ""
 authors = []
 readme = "README.md"
-requires-python = ">=3.12.0,<4"
+requires-python = ">=3.14.0,<4"
 dependencies = [
     "aiohttp>=3.13.5",
+    "homeassistant-api>=6.0.0",
     "pydantic>=2.13.3",
-    "rich>=14.3.0",
+    "qbittorrent-api>=2026.5.0",
 ]
 
 [project.optional-dependencies]
-type = ["mypy>=1.19.0", "ty>=0.0.23"]
+type = ["ty>=0.0.69"]
 
-lint = ["ruff>=0.15.6"]
+lint = ["ruff>=0.16.2"]
 
 test = [
-    "pytest>=9.0.0",
+    "pytest>=9.1.0",
     "coverage>=7.13.0",
     "pytest-mock",
     "pytest-random-order",
@@ -25,21 +26,18 @@ test = [
 ]
 
 [project.urls]
-Repository = "https://github.com/kism/python-boilerplate"
+Repository = "https://github.com/kism/qbt-shaper"
 
 [build-system]
-requires = ["uv_build>=0.11.0,<0.12.0"]
+requires = ["uv_build>=0.12.0,<0.13.0"]
 build-backend = "uv_build"
 
-[tool.uv.build-backend]
-module-root = ""
 
 [project.scripts]
 qbt-shaper = "qbt_shaper:__main__.main"
 
 [tool.ruff]
 cache-dir = "~/.cache/ruff"
-target-version = "py312"
 line-length = 120
 
 [tool.ruff.lint]
@@ -50,6 +48,7 @@ ignore = [
     "AIR",  # Airflow not required
     "FAST", # FastAPI not required
     "DTZ",  # no need to specify timezone for time objects
+    "CPY",  # no need to specify copyright notice in every file
 
     # Specific rules
     "TD002",  # Verbose TODO, only I work on this project
@@ -57,6 +56,8 @@ ignore = [
     "ISC001", # conflict in the formatter
     "COM812", # conflict in the formatter
     "D",      # Don't care about docstrings
+    "G201",   # Happy to log exceptions as errors
+    "TRY400", # Fine to log web exceptions as errors
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -74,6 +75,7 @@ ignore = [
     "PT004",   # monkeypatch doesn't return.
     "S311",    # I'll assume no real crypto will be done in PyTest.
     "S105",    # Hardcoded fake passwords are fine in tests.
+    "S106",    # Hardcoded fake passwords as arguments are fine in tests.
     "PLR0913", # Tests can have as many arguments as they want.
     "BLE001",  # Tests can use BaseException.
     "S311",    # Regular RNG is fine in tests.
@@ -107,20 +109,3 @@ sort = "-Miss"
 
 [tool.coverage.html]
 show_contexts = true
-
-[tool.mypy]
-files = ["qbt_shaper", "tests"]
-show_error_codes = true
-strict = true
-enable_error_code = [
-    "ignore-without-code",
-    "redundant-expr",
-    "truthy-bool",
-    "type-arg",
-    "unused-awaitable",
-    "possibly-undefined",
-    "redundant-self",
-]
-warn_unreachable = true
-warn_redundant_casts = true
-warn_no_return = true

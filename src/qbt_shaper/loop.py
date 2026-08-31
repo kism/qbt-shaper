@@ -1,0 +1,177 @@
+"""Main application loop."""
+
+from __future__ import annotations
+
+import asyncio
+import time
+from dataclasses import dataclass
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+import aiohttp
+
+from .constants import OUR_TIMEZONE
+from .services.dispatcharr import DispatcharrClient
+from .services.homeassistant import HomeAssistantClient
+from .services.jellyfin import JellyfinClient
+from .services.qbittorrent import QbittorrentClient
+from .throttle import PriorityThrottler
+from .utils.logger import get_logger
+
+if TYPE_CHECKING:
+    from logging import Logger
+
+    from .config import AppConfig
+
+LOOP_INTERVAL_SECONDS = 15
+PRESENCE_CHECK_INTERVAL_SECONDS = 60
+STREAM_COOLDOWN_SECONDS = 180  # 3 minutes
+ERRORED_RECHECK_INTERVAL_SECONDS = 900  # 15 minutes
+
+
+logger = get_logger(__name__)
+
+
+@dataclass
+class _LoopState:
+    someone_streaming: bool
+    someone_home: bool
+    bed_time: bool
+
+    def log_state(self, logger: Logger) -> None:
+        current_time_nice = datetime.now(tz=OUR_TIMEZONE).strftime("%Y-%m-%d %H:%M:%S %Z")
+        logger.info(
+            "New state at %s: streaming=%s, someone_home=%s, bed_time=%s",
+            current_time_nice,
+            str(self.someone_streaming).lower(),
+            str(self.someone_home).lower(),
+            str(self.bed_time).lower(),
+        )
+
+
+async def _check_active_streams(
+    jellyfin_clients: list[JellyfinClient],
+    dispatcharr_clients: list[DispatcharrClient],
+) -> bool:
+    """Return True if any Jellyfin or Dispatcharr instance reports active streams."""
+    checks = [
+        *[client.has_active_streams() for client in jellyfin_clients],
+        *[client.has_active_streams() for client in dispatcharr_clients],
+    ]
+    results = await asyncio.gather(*checks, return_exceptions=True)
+    for result in results:
+        if isinstance(result, Exception):
+            logger.warning("Stream check failed: %s", result)
+        elif result is True:
+            return True
+    return False
+
+
+async def _apply_speed_limit(
+    qbt_clients: list[QbittorrentClient],
+    *,
+    limit: bool,
+) -> None:
+    """Enable or disable speed limiting on all configured qBittorrent instances."""
+    results = await asyncio.gather(
+        *[client.set_speed_limit_enabled(enabled=limit) for client in qbt_clients],
+        return_exceptions=True,
+    )
+    for result in results:
+        if isinstance(result, Exception):
+            logger.warning("Failed to set speed limit on qBittorrent instance", exc_info=result)
+
+
+async def _recheck_errored_torrents(qbt_clients: list[QbittorrentClient]) -> None:
+    """Force a recheck of errored torrents on all instances that have it enabled."""
+    results = await asyncio.gather(
+        *[client.recheck_errored() for client in qbt_clients],
+        return_exceptions=True,
+    )
+    for result in results:
+        if isinstance(result, Exception):
+            logger.warning("Errored-torrent recheck failed", exc_info=result)
+
+
+async def _determine_presence(ha_client: HomeAssistantClient) -> str:
+    """Return 'present' or 'vacant' based on Home Assistant presence state."""
+    if not ha_client.is_configured():
+        logger.debug("Home Assistant not configured, defaulting to present")
+        return "present"
+    anyone_home = await ha_client.any_entity_home()
+    state = "present" if anyone_home else "vacant"
+    logger.debug("Presence state: %s", state)
+    return state
+
+
+async def run_loop(config: AppConfig) -> None:
+    """Run the main monitoring and control loop."""
+    async with aiohttp.ClientSession() as session:
+        jellyfin_clients = [JellyfinClient(cfg, session) for cfg in config.jellyfin_instances]
+        dispatcharr_clients = [DispatcharrClient(cfg, session) for cfg in config.dispatcharr_instances]
+        qbt_clients = [QbittorrentClient(cfg, config.qbittorrent_speed) for cfg in config.qbittorrent_instances]
+        ha_client = HomeAssistantClient(config.home_assistant)
+
+        logger.info(
+            "Monitoring %d Jellyfin, %d Dispatcharr, %d qBittorrent instance(s)",
+            len(jellyfin_clients),
+            len(dispatcharr_clients),
+            len(qbt_clients),
+        )
+
+        throttler = PriorityThrottler(qbt_clients, config.qbittorrent_speed)
+
+        for client in qbt_clients:
+            await client.login()
+            await client.apply_streaming_limits()
+
+        current_presence = "present"
+        last_presence_check = time.monotonic() - PRESENCE_CHECK_INTERVAL_SECONDS
+        last_errored_recheck = time.monotonic() - ERRORED_RECHECK_INTERVAL_SECONDS
+        last_stream_active: float | None = None
+        last_logged_state: _LoopState | None = None
+
+        while True:
+            now = time.monotonic()
+
+            active = await _check_active_streams(jellyfin_clients, dispatcharr_clients)
+            if active:
+                last_stream_active = now
+
+            if not active and last_stream_active is not None:
+                elapsed = now - last_stream_active
+                in_cooldown = elapsed < STREAM_COOLDOWN_SECONDS
+                if in_cooldown:
+                    remaining = int(STREAM_COOLDOWN_SECONDS - elapsed)
+                    logger.info("Stream cooldown active, %ds remaining before releasing throttle", remaining)
+            else:
+                in_cooldown = False
+
+            await _apply_speed_limit(qbt_clients, limit=active or in_cooldown)
+
+            if now - last_presence_check >= PRESENCE_CHECK_INTERVAL_SECONDS:
+                current_presence = await _determine_presence(ha_client)
+                last_presence_check = now
+
+            if now - last_errored_recheck >= ERRORED_RECHECK_INTERVAL_SECONDS:
+                await _recheck_errored_torrents(qbt_clients)
+                last_errored_recheck = now
+
+            bedtime = config.bedtime.is_active()
+            effective_presence = current_presence
+            if bedtime:
+                effective_presence = "vacant"
+                logger.debug("Bedtime active, overriding presence '%s' → 'vacant'", current_presence)
+
+            await throttler.apply(effective_presence)
+
+            current_state = _LoopState(
+                someone_streaming=active,
+                someone_home=current_presence == "present",
+                bed_time=bedtime,
+            )
+            if current_state != last_logged_state:
+                current_state.log_state(logger)
+                last_logged_state = current_state
+
+            await asyncio.sleep(LOOP_INTERVAL_SECONDS)
