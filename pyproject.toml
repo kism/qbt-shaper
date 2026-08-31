@@ -9,6 +9,7 @@ dependencies = [
     "aiohttp>=3.13.5",
     "homeassistant-api>=6.0.0",
     "pydantic>=2.13.3",
+    "python-dotenv>=1.2.3",
     "qbittorrent-api>=2026.5.0",
 ]
 

@@ -6,16 +6,23 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from dotenv import dotenv_values, find_dotenv, load_dotenv
 from pydantic import BaseModel, Field, field_validator
 
 from .utils.logger import get_logger
 
-DEFAULT_CONFIG_PATH = Path.home() / ".config" / "qbt-shaper" / "config.json"
-if os.environ.get("QBT_SHAPER_CONFIG_PATH"):
-    DEFAULT_CONFIG_PATH = Path(os.environ["QBT_SHAPER_CONFIG_PATH"])
-
-
 logger = get_logger(__name__)
+
+_ENV_VAR = "QBT_SHAPER_CONFIG_PATH"
+_ENV_FILE = find_dotenv(usecwd=True)
+_FROM_REAL_ENV = _ENV_VAR in os.environ
+load_dotenv(_ENV_FILE)  # Does not override variables already in the real environment
+
+DEFAULT_CONFIG_PATH = Path.home() / ".config" / "qbt-shaper" / "config.json"
+CONFIG_PATH_SOURCE = "default location"
+if os.environ.get(_ENV_VAR):
+    DEFAULT_CONFIG_PATH = Path(os.environ[_ENV_VAR])
+    CONFIG_PATH_SOURCE = f"${_ENV_VAR}" if _FROM_REAL_ENV else f"${_ENV_VAR} in {_ENV_FILE}"
 
 
 def _parse_time_to_iso(value: str) -> str:
@@ -151,11 +158,20 @@ def load_config(config_path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
 
     If the file does not exist, write a default config and return it.
     """
+    if _ENV_FILE:
+        logger.info(
+            "Loaded environment file %s, defining: %s", _ENV_FILE, ", ".join(dotenv_values(_ENV_FILE)) or "nothing"
+        )
+    else:
+        logger.debug("No .env file found")
+
+    source = CONFIG_PATH_SOURCE if config_path == DEFAULT_CONFIG_PATH else "--config argument"
+    logger.info("Config path %s, from %s", config_path, source)
+
     if not config_path.exists():
-        logger.info("Config file not found at %s, using defaults", config_path)
+        logger.warning("Config file not found, using defaults from %s", source)
         return AppConfig()
 
-    logger.info("Loading config from %s", config_path)
     raw = json.loads(config_path.read_text(encoding="utf-8"))
     return AppConfig.model_validate(raw)
 
