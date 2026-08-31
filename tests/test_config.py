@@ -1,6 +1,15 @@
 """Config tests."""
 
-from qbt_shaper.config import AppConfig, QbittorrentConfig, load_config, write_config
+import pytest
+
+from qbt_shaper.config import (
+    AppConfig,
+    BedtimeConfig,
+    QbittorrentConfig,
+    _parse_time_to_iso,
+    load_config,
+    write_config,
+)
 
 
 def test_load_config_missing_file(tmp_path) -> None:
@@ -22,3 +31,25 @@ def test_config_round_trip(tmp_path) -> None:
 
     assert loaded == config
     assert loaded.qbittorrent_instances[0].force_recheck_errored is True
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("22:00+10:00", "22:00+10:00"),
+        ("10:00 PM+10:00", "22:00+10:00"),
+        ("7am-05:00", "07:00-05:00"),
+    ],
+)
+def test_parse_time_to_iso(value, expected) -> None:
+    assert _parse_time_to_iso(value) == expected
+
+
+def test_parse_time_to_iso_invalid() -> None:
+    with pytest.raises(ValueError, match="Cannot parse time string"):
+        _parse_time_to_iso("bedtime o'clock")
+
+
+def test_bedtime_is_active() -> None:
+    assert BedtimeConfig(enabled=False, start="00:00+00:00", stop="23:59+00:00").is_active() is False
+    assert BedtimeConfig(enabled=True, start="00:00+00:00", stop="23:59+00:00").is_active() is True

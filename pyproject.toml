@@ -62,7 +62,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*.py" = [
+"tests/**/*.py" = [
     # Modules
     "ARG", # Unused function args -> fixtures nevertheless are functionally relevant
     "FBT", # Don't care about booleans as positional arguments in tests, e.g. via @pytest.mark.parametrize()
@@ -80,6 +80,8 @@ ignore = [
     "PLR0913", # Tests can have as many arguments as they want.
     "BLE001",  # Tests can use BaseException.
     "S311",    # Regular RNG is fine in tests.
+    "S107",    # Hardcoded fake passwords as defaults are fine in tests.
+    "PLR2004", # Magic values in test assertions are the point.
 ]
 
 
