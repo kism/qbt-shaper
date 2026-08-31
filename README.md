@@ -1,70 +1,58 @@
-# qbt_shaper
+# qbt-shaper
 
 [![Check](https://github.com/kism/qbt-shaper/actions/workflows/check.yml/badge.svg)](https://github.com/kism/qbt-shaper/actions/workflows/check.yml)
 [![CheckType](https://github.com/kism/qbt-shaper/actions/workflows/check_types.yml/badge.svg)](https://github.com/kism/qbt-shaper/actions/workflows/check_types.yml)
 [![Test](https://github.com/kism/qbt-shaper/actions/workflows/test.yml/badge.svg)](https://github.com/kism/qbt-shaper/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/kism/qbt-shaper/graph/badge.svg?token=FPGDA0ODT7)](https://codecov.io/gh/kism/qbt-shaper)
 
-## Prerequisites
+Throttles qBittorrent so your torrents don't ruin your streams.
 
-Install uv and uvx with the installer script <https://docs.astral.sh/uv/getting-started/installation/>
+It polls Jellyfin and Dispatcharr for active streams and applies speed limits to
+one or more qBittorrent instances. qBittorrent instances are grouped by
+`priority` (lower number = higher priority); upload used by a higher priority
+group is subtracted from the caps given to lower priority groups.
 
-## Run
+Optionally, Home Assistant presence entities select a different set of limits
+when nobody is home, and a bedtime window can force the "vacant" limits.
 
-### Setup
+## Install
+
+Install uv: <https://docs.astral.sh/uv/getting-started/installation/>
 
 ```bash
 uv venv
 source .venv/bin/activate
-uv sync --all-extras # Omit --all-extras for prod
+uv sync # add --all-extras for the lint/type/test tooling
 ```
 
-### Running the app
+## Run
 
 ```bash
-python -m qbt_shaper
+uv run qbt-shaper
 ```
 
-## Check/Test
-
-### Checking
-
-Run `ruff check` or get the vscode ruff extension, the rules are defined in pyproject.toml.
-
-### Type Checking
-
-Run `mypy` or get the vscode mypy extension not by Microsoft, the rules are defined in pyproject.toml.
-
-### Testing
-
-Run `pytest`, It will get its config from pyproject.toml
-
-Of course when you start writing your app many of the tests will break. With the comments it serves as a somewhat tutorial on using `pytest`, that being said I am not an expert.
-
-### Workflows
-
-The '.github' folder has both a Check and Test workflow.
-
-To get the workflow passing badges on your repo, have a look at <https://docs.github.com/en/actions/monitoring-and-troubleshooting-workflows/adding-a-workflow-status-badge>
-
-Or if you are not using GitHub you can check out workflow badges from your Git hosting service, or use <https://shields.io/> which pretty much covers everything.
-
-### Test Coverage
-
-#### Locally
-
-To get code coverage locally, the config is set in 'pyproject.toml', or run with `pytest`
-
-```bash
-python -m http.server -b 127.0.0.1 8000 -d htmlcov
-```
-
-Open the link in your browser and browse into the 'htmlcov' directory.
-
-#### Codecov
-
-The template repo uses codecov to get a badge on the README.md, look at their guides on config that up since it's stripped out of this repo.
+Options: `-v` (repeat for more verbosity), `--config PATH`.
 
 ## Config
 
-Defaults are defined in config.py, and config loading and validation are handled in there too.
+JSON, at `~/.config/qbt-shaper/config.json` by default. Override with `--config`
+or the `QBT_SHAPER_CONFIG_PATH` environment variable (a `.env` file works too).
+
+Run the app once to write a config file populated with defaults, then fill it
+in. All fields and defaults are defined in
+[config.py](src/qbt_shaper/config.py).
+
+Speeds in the config are kbps. `*_streaming_percent`, `*_present_percent` and
+`*_vacant_percent` are percentages of `dl_max_kbps`/`ul_max_kbps`.
+
+## Development
+
+| Task       | Command                           |
+| ---------- | --------------------------------- |
+| Lint       | `ruff format && ruff check --fix` |
+| Type check | `mypy && ty check .`              |
+| Test       | `pytest`                          |
+| Coverage   | `coverage run && coverage report` |
+| Full CI    | `bash scripts/run-ci-local.sh`    |
+
+All tooling config lives in [pyproject.toml](pyproject.toml).
