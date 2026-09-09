@@ -22,7 +22,7 @@ Install uv: <https://docs.astral.sh/uv/getting-started/installation/>
 ```bash
 uv venv
 source .venv/bin/activate
-uv sync # add --all-extras for the lint/type/test tooling
+uv sync # dev tooling (lint/type/test) is in the default group; use --no-default-groups to skip it
 ```
 
 ## Run

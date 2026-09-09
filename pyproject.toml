@@ -13,11 +13,9 @@ dependencies = [
     "qbittorrent-api>=2026.5.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 type = ["ty>=0.0.69"]
-
 lint = ["ruff>=0.16.2"]
-
 test = [
     "pytest>=9.1.0",
     "coverage>=7.13.0",
@@ -25,6 +23,7 @@ test = [
     "pytest-random-order",
     "detect-test-pollution",
 ]
+dev = [{ include-group = "type" }, { include-group = "lint" }, { include-group = "test" }]
 
 [project.urls]
 Repository = "https://github.com/kism/qbt-shaper"

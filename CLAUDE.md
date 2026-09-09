@@ -7,7 +7,7 @@ Async Python app that monitors Jellyfin/Dispatcharr for active streams and throt
 ```bash
 uv venv
 source .venv/bin/activate
-uv sync --all-extras
+uv sync
 ```
 
 ## Common Commands
