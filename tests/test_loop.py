@@ -47,3 +47,33 @@ def test_run_loop_single_pass(monkeypatch, caplog):
         asyncio.run(loop.run_loop(AppConfig()))
 
     assert "streaming=false, someone_home=true, bed_time=false" in caplog.text
+
+
+def test_run_loop_survives_unreachable_services(monkeypatch, caplog):
+    config = AppConfig.model_validate(
+        {"qbittorrent_instances": [{"url": "http://qbt.invalid", "username": "u", "password": "p"}]}
+    )
+    iterations = 0
+
+    async def fake_sleep(delay):
+        nonlocal iterations
+        iterations += 1
+        if iterations == 2:
+            raise _StopLoopError
+
+    async def unreachable(*_args, **_kwargs):
+        raise ConnectionError
+
+    async def boom(*_args, **_kwargs):
+        raise RuntimeError
+
+    monkeypatch.setattr(loop.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(loop.QbittorrentClient, "apply_streaming_limits", unreachable)
+    monkeypatch.setattr(loop, "_check_active_streams", boom)
+
+    with pytest.raises(_StopLoopError):
+        asyncio.run(loop.run_loop(config))
+
+    assert iterations == 2
+    assert "Failed to set streaming limits" in caplog.text
+    assert "Unexpected error in main loop" in caplog.text

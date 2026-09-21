@@ -16,6 +16,7 @@ from .services.homeassistant import HomeAssistantClient
 from .services.jellyfin import JellyfinClient
 from .services.qbittorrent import QbittorrentClient
 from .throttle import PriorityThrottler
+from .utils.backoff import BackoffActiveError
 from .utils.logger import get_logger
 
 if TYPE_CHECKING:
@@ -27,6 +28,7 @@ LOOP_INTERVAL_SECONDS = 15
 PRESENCE_CHECK_INTERVAL_SECONDS = 60
 STREAM_COOLDOWN_SECONDS = 180  # 3 minutes
 ERRORED_RECHECK_INTERVAL_SECONDS = 900  # 15 minutes
+HTTP_TIMEOUT_SECONDS = 10
 
 
 logger = get_logger(__name__)
@@ -60,6 +62,8 @@ async def _check_active_streams(
     ]
     results = await asyncio.gather(*checks, return_exceptions=True)
     for result in results:
+        if isinstance(result, BackoffActiveError):
+            continue
         if isinstance(result, Exception):
             logger.warning("Stream check failed: %s", result)
         elif result is True:
@@ -78,8 +82,23 @@ async def _apply_speed_limit(
         return_exceptions=True,
     )
     for result in results:
+        if isinstance(result, BackoffActiveError):
+            continue
         if isinstance(result, Exception):
-            logger.warning("Failed to set speed limit on qBittorrent instance", exc_info=result)
+            logger.warning("Failed to set speed limit on qBittorrent instance: %r", result)
+
+
+async def _apply_streaming_limits(qbt_clients: list[QbittorrentClient]) -> None:
+    """Set alt (streaming) limits; cached per client, so this retries only instances that failed before."""
+    results = await asyncio.gather(
+        *[client.apply_streaming_limits() for client in qbt_clients],
+        return_exceptions=True,
+    )
+    for result in results:
+        if isinstance(result, BackoffActiveError):
+            continue
+        if isinstance(result, Exception):
+            logger.warning("Failed to set streaming limits on qBittorrent instance: %r", result)
 
 
 async def _recheck_errored_torrents(qbt_clients: list[QbittorrentClient]) -> None:
@@ -89,8 +108,10 @@ async def _recheck_errored_torrents(qbt_clients: list[QbittorrentClient]) -> Non
         return_exceptions=True,
     )
     for result in results:
+        if isinstance(result, BackoffActiveError):
+            continue
         if isinstance(result, Exception):
-            logger.warning("Errored-torrent recheck failed", exc_info=result)
+            logger.warning("Errored-torrent recheck failed: %r", result)
 
 
 async def _determine_presence(ha_client: HomeAssistantClient) -> str:
@@ -106,7 +127,7 @@ async def _determine_presence(ha_client: HomeAssistantClient) -> str:
 
 async def run_loop(config: AppConfig) -> None:
     """Run the main monitoring and control loop."""
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=HTTP_TIMEOUT_SECONDS)) as session:
         jellyfin_clients = [JellyfinClient(cfg, session) for cfg in config.jellyfin_instances]
         dispatcharr_clients = [DispatcharrClient(cfg, session) for cfg in config.dispatcharr_instances]
         qbt_clients = [QbittorrentClient(cfg, config.qbittorrent_speed) for cfg in config.qbittorrent_instances]
@@ -121,10 +142,6 @@ async def run_loop(config: AppConfig) -> None:
 
         throttler = PriorityThrottler(qbt_clients, config.qbittorrent_speed)
 
-        for client in qbt_clients:
-            await client.login()
-            await client.apply_streaming_limits()
-
         current_presence = "present"
         last_presence_check = time.monotonic() - PRESENCE_CHECK_INTERVAL_SECONDS
         last_errored_recheck = time.monotonic() - ERRORED_RECHECK_INTERVAL_SECONDS
@@ -133,45 +150,50 @@ async def run_loop(config: AppConfig) -> None:
 
         while True:
             now = time.monotonic()
+            try:
+                await _apply_streaming_limits(qbt_clients)
 
-            active = await _check_active_streams(jellyfin_clients, dispatcharr_clients)
-            if active:
-                last_stream_active = now
+                active = await _check_active_streams(jellyfin_clients, dispatcharr_clients)
+                if active:
+                    last_stream_active = now
 
-            if not active and last_stream_active is not None:
-                elapsed = now - last_stream_active
-                in_cooldown = elapsed < STREAM_COOLDOWN_SECONDS
-                if in_cooldown:
-                    remaining = int(STREAM_COOLDOWN_SECONDS - elapsed)
-                    logger.info("Stream cooldown active, %ds remaining before releasing throttle", remaining)
-            else:
-                in_cooldown = False
+                if not active and last_stream_active is not None:
+                    elapsed = now - last_stream_active
+                    in_cooldown = elapsed < STREAM_COOLDOWN_SECONDS
+                    if in_cooldown:
+                        remaining = int(STREAM_COOLDOWN_SECONDS - elapsed)
+                        logger.info("Stream cooldown active, %ds remaining before releasing throttle", remaining)
+                else:
+                    in_cooldown = False
 
-            await _apply_speed_limit(qbt_clients, limit=active or in_cooldown)
+                await _apply_speed_limit(qbt_clients, limit=active or in_cooldown)
 
-            if now - last_presence_check >= PRESENCE_CHECK_INTERVAL_SECONDS:
-                current_presence = await _determine_presence(ha_client)
-                last_presence_check = now
+                if now - last_presence_check >= PRESENCE_CHECK_INTERVAL_SECONDS:
+                    current_presence = await _determine_presence(ha_client)
+                    last_presence_check = now
 
-            if now - last_errored_recheck >= ERRORED_RECHECK_INTERVAL_SECONDS:
-                await _recheck_errored_torrents(qbt_clients)
-                last_errored_recheck = now
+                if now - last_errored_recheck >= ERRORED_RECHECK_INTERVAL_SECONDS:
+                    await _recheck_errored_torrents(qbt_clients)
+                    last_errored_recheck = now
 
-            bedtime = config.bedtime.is_active()
-            effective_presence = current_presence
-            if bedtime:
-                effective_presence = "vacant"
-                logger.debug("Bedtime active, overriding presence '%s' → 'vacant'", current_presence)
+                bedtime = config.bedtime.is_active()
+                effective_presence = current_presence
+                if bedtime:
+                    effective_presence = "vacant"
+                    logger.debug("Bedtime active, overriding presence '%s' → 'vacant'", current_presence)
 
-            await throttler.apply(effective_presence)
+                await throttler.apply(effective_presence)
 
-            current_state = _LoopState(
-                someone_streaming=active,
-                someone_home=current_presence == "present",
-                bed_time=bedtime,
-            )
-            if current_state != last_logged_state:
-                current_state.log_state(logger)
-                last_logged_state = current_state
+                current_state = _LoopState(
+                    someone_streaming=active,
+                    someone_home=current_presence == "present",
+                    bed_time=bedtime,
+                )
+                if current_state != last_logged_state:
+                    current_state.log_state(logger)
+                    last_logged_state = current_state
+            except Exception:
+                # ponytail: last-resort guard so one bad iteration never kills the service
+                logger.exception("Unexpected error in main loop, retrying in %ds", LOOP_INTERVAL_SECONDS)
 
             await asyncio.sleep(LOOP_INTERVAL_SECONDS)

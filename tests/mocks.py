@@ -96,10 +96,6 @@ class FakeQbtClient:
         self.prefs: list[dict[str, int]] = []
         self.limits_mode: list[bool] = []
         self.rechecked: list[str] = []
-        self.logged_in = False
-
-    def auth_log_in(self) -> None:
-        self.logged_in = True
 
     def transfer_info(self) -> dict[str, Any]:
         return QbtTransferInfo(up_info_speed=self.up_info_speed).model_dump()

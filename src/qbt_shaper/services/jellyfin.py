@@ -4,6 +4,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
 
 from qbt_shaper.constants import PROGRAM_NAME, PROGRAM_VERSION
+from qbt_shaper.utils.backoff import Backoff
 from qbt_shaper.utils.logger import get_logger
 
 if TYPE_CHECKING:
@@ -24,6 +25,7 @@ class JellyfinClient:
         self._config = config
         self._session = session
         self._token: str | None = None
+        self._backoff = Backoff(f"Jellyfin at {config.url}")
 
     def _url(self, path: str) -> str:
         return self._config.url.rstrip("/") + path
@@ -56,6 +58,11 @@ class JellyfinClient:
         logger.info("Logged in to Jellyfin at %s", self._config.url)
 
     async def has_active_streams(self) -> bool:
+        """Return True if the instance reports active streams; refused while backed off."""
+        with self._backoff:
+            return await self._fetch_active_streams()
+
+    async def _fetch_active_streams(self) -> bool:
         """Return True if any session currently has a NowPlayingItem.
 
         Re-authenticates once if the token has expired (HTTP 401).
