@@ -3,6 +3,7 @@
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
 
+from qbt_shaper.utils.backoff import Backoff
 from qbt_shaper.utils.logger import get_logger
 
 if TYPE_CHECKING:
@@ -27,6 +28,7 @@ class DispatcharrClient:
         self._config = config
         self._session = session
         self._token: str | None = None
+        self._backoff = Backoff(f"Dispatcharr at {config.url}")
 
     def _url(self, path: str) -> str:
         return self._config.url.rstrip("/") + path
@@ -50,6 +52,11 @@ class DispatcharrClient:
         logger.info("Logged in to Dispatcharr at %s", self._config.url)
 
     async def has_active_streams(self) -> bool:
+        """Return True if the instance reports active streams; refused while backed off."""
+        with self._backoff:
+            return await self._fetch_active_streams()
+
+    async def _fetch_active_streams(self) -> bool:
         """Return True if any channel is currently active.
 
         Fetches GET /proxy/ts/status and checks the top-level ``count`` field.

@@ -5,9 +5,12 @@ from typing import TYPE_CHECKING
 
 import qbittorrentapi
 
+from qbt_shaper.utils.backoff import Backoff
 from qbt_shaper.utils.logger import get_logger
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from qbt_shaper.config import QbittorrentConfig, QbittorrentSpeedConfig
 else:
     QbittorrentConfig = object
@@ -37,15 +40,15 @@ class QbittorrentClient:
         self._applied_global: tuple[int, int] | None = None
         self._applied_alt: tuple[int, int] | None = None
         self._applied_limit_enabled: bool | None = None
+        self._backoff = Backoff(f"qBittorrent at {config.url}")
 
-    async def login(self) -> None:
-        """Authenticate with the qBittorrent WebUI."""
-        await asyncio.to_thread(self._client.auth_log_in)
-        logger.info("Logged in to qBittorrent at %s", self._client.host)
+    async def _call[**P, T](self, fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
+        with self._backoff:
+            return await asyncio.to_thread(fn, *args, **kwargs)
 
     async def get_upload_speed_bytes(self) -> int:
         """Return the current upload speed in bytes/s."""
-        info = await asyncio.to_thread(self._client.transfer_info)
+        info = await self._call(self._client.transfer_info)
         speed = info["up_info_speed"]
         return speed if isinstance(speed, int) else 0
 
@@ -70,7 +73,7 @@ class QbittorrentClient:
         ul_bytes = ul_kib * 1024
         if self._applied_alt == (dl_bytes, ul_bytes):
             return
-        await asyncio.to_thread(
+        await self._call(
             self._client.app_set_preferences,
             {"alt_dl_limit": dl_bytes, "alt_up_limit": ul_bytes},
         )
@@ -95,7 +98,7 @@ class QbittorrentClient:
             ul_change = abs(ul_bytes - applied_ul) / max(applied_ul, 1)
             if dl_change <= _SPEED_CHANGE_THRESHOLD and ul_change <= _SPEED_CHANGE_THRESHOLD:
                 return
-        await asyncio.to_thread(
+        await self._call(
             self._client.app_set_preferences,
             {"dl_limit": dl_bytes, "up_limit": ul_bytes},
         )
@@ -128,11 +131,11 @@ class QbittorrentClient:
         """Force a recheck of all torrents in an errored state, if enabled for this instance."""
         if not self.force_recheck_errored:
             return
-        torrents = await asyncio.to_thread(self._client.torrents_info, status_filter="errored")
+        torrents = await self._call(self._client.torrents_info, status_filter="errored")
         hashes = [t.hash for t in torrents]
         if not hashes:
             return
-        await asyncio.to_thread(self._client.torrents_recheck, torrent_hashes=hashes)
+        await self._call(self._client.torrents_recheck, torrent_hashes=hashes)
         logger.info(
             "Forced recheck of %d errored torrent(s) on qBittorrent at %s",
             len(hashes),
@@ -146,7 +149,7 @@ class QbittorrentClient:
         """
         if self._applied_limit_enabled == enabled:
             return
-        await asyncio.to_thread(self._client.transfer_set_speed_limits_mode, enabled)
+        await self._call(self._client.transfer_set_speed_limits_mode, enabled)
         self._applied_limit_enabled = enabled
         state = "enabled" if enabled else "disabled"
         logger.info("Speed limit %s on qBittorrent at %s", state, self._client.host)

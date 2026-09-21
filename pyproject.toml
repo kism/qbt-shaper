@@ -1,6 +1,6 @@
 [project]
 name = "qbt-shaper"
-version = "0.0.1"
+version = "0.0.3"
 description = ""
 authors = []
 readme = "README.md"

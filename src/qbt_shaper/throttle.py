@@ -5,6 +5,7 @@ import logging
 from collections import deque
 from typing import TYPE_CHECKING
 
+from .utils.backoff import BackoffActiveError
 from .utils.logger import get_logger
 
 if TYPE_CHECKING:
@@ -92,5 +93,7 @@ class PriorityThrottler:
                 )
                 try:
                     await client._apply_global_limits(description, base_dl, throttled_ul)  # noqa: SLF001
-                except Exception:
-                    logger.warning("Failed to apply limits on qBittorrent instance", exc_info=True)
+                except BackoffActiveError:
+                    pass
+                except Exception as e:  # noqa: BLE001
+                    logger.warning("Failed to apply limits on qBittorrent instance: %r", e)
