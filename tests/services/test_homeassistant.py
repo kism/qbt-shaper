@@ -22,3 +22,18 @@ def test_any_entity_home(monkeypatch):
 
     monkeypatch.setattr(FakeHaClient, "states", {"device_tracker.phone": "home"})
     assert asyncio.run(HomeAssistantClient(CONFIG).any_entity_home()) is True
+
+
+def test_any_entity_home_errors(monkeypatch):
+    async def boom(*_, **__):
+        raise RuntimeError
+
+    monkeypatch.setattr(homeassistant, "AsyncClient", FakeHaClient)
+    monkeypatch.setattr(FakeHaClient, "get_state", boom)
+    assert asyncio.run(HomeAssistantClient(CONFIG).any_entity_home()) is False
+
+    def connect_fail(*_):
+        raise ConnectionError
+
+    monkeypatch.setattr(homeassistant, "AsyncClient", connect_fail)
+    assert asyncio.run(HomeAssistantClient(CONFIG).any_entity_home()) is False

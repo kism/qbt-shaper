@@ -4,6 +4,7 @@ import asyncio
 
 from qbt_shaper.config import QbittorrentSpeedConfig
 from qbt_shaper.throttle import PriorityThrottler
+from qbt_shaper.utils.backoff import BackoffActiveError
 
 # 1000 kbps == 125000 bytes/s, and 100% of that is the base limit for both tests.
 SPEED = QbittorrentSpeedConfig(dl_max_kbps=1000, ul_max_kbps=1000, dl_present_percent=100, ul_present_percent=100)
@@ -27,3 +28,16 @@ def test_apply_does_not_throttle_peers(qbt):
     asyncio.run(PriorityThrottler(peers, SPEED).apply("present"))
 
     assert [p._client.prefs[-1]["up_limit"] for p in peers] == [125000, 125000]
+
+
+def test_apply_swallows_errors(qbt, monkeypatch):
+    clients = [qbt(SPEED, priority=1), qbt(SPEED, priority=2)]
+    errors = iter([BackoffActiveError("x"), RuntimeError("y")])
+
+    async def boom(*_):
+        raise next(errors)
+
+    for c in clients:
+        monkeypatch.setattr(c, "_apply_global_limits", boom)
+
+    asyncio.run(PriorityThrottler(clients, SPEED).apply("present"))

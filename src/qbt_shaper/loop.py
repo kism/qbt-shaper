@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -29,6 +30,7 @@ PRESENCE_CHECK_INTERVAL_SECONDS = 60
 STREAM_COOLDOWN_SECONDS = 180  # 3 minutes
 ERRORED_RECHECK_INTERVAL_SECONDS = 900  # 15 minutes
 HTTP_TIMEOUT_SECONDS = 10
+LOOP_ITERATIONS: int | None = None  # None runs forever; tests set a count
 
 
 logger = get_logger(__name__)
@@ -148,7 +150,8 @@ async def run_loop(config: AppConfig) -> None:
         last_stream_active: float | None = None
         last_logged_state: _LoopState | None = None
 
-        while True:
+        # This is `while True` when outside of pytest
+        for _ in itertools.count() if LOOP_ITERATIONS is None else range(LOOP_ITERATIONS):
             now = time.monotonic()
             try:
                 await _apply_streaming_limits(qbt_clients)
